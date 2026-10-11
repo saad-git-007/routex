@@ -879,3 +879,6 @@ html.is-map-full, html.is-map-full body { overflow: hidden; }
 .hidden-cams p { flex: 1; min-width: 0; color: var(--text-2); line-height: 1.4; }
 .hidden-cams b { color: var(--text); font-weight: 600; }
 .hidden-cams .btn-sm { flex: none; border-color: var(--review-line); color: var(--text); }
+/* Zoom view hint: phones and tablets get the touch wording, computers the mouse one. */
+.hint-touch { display: none; }
+@media (pointer: coarse) { .hint-touch { display: inline; } .hint-mouse { display: none; } }

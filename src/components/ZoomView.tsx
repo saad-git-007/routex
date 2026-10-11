@@ -111,7 +111,7 @@ export function ZoomView({ cam, onClose }: { cam: Camera | null; onClose: () => 
             {isLive(cam.id) ? <LiveVideo id={cam.id} alt={`Live video from ${cam.name}`} className="zoom-live" videoRef={(el) => { img.current = el }} />
               : (isStill(cam.id) || f?.url) ? <img ref={(el) => { img.current = el }} src={isStill(cam.id) ? directUrl(cam.id, Math.floor(Date.now() / 60e3)) : f!.url} alt={`Latest picture from ${cam.name}`} draggable={false} /> : <div className="shot-loading" />}
           </div>
-          <p className="zv-hint">Pinch, scroll or double-tap to zoom · drag to look around</p>
+          <p className="zv-hint"><span className="hint-touch">Pinch to zoom in and out. Double tap to close.</span><span className="hint-mouse">Scroll to zoom in and out · drag to look around · Esc to close</span></p>
         </>
       )}
     </dialog>

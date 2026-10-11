@@ -18,6 +18,8 @@ export function ZoomView({ cam, onClose }: { cam: Camera | null; onClose: () => 
   const ptrs = useRef(new Map<number, { x: number; y: number }>())
   const pinch = useRef<{ d: number; s: number } | null>(null)
   const lastTap = useRef(0)
+  // A double tap that opened this view also sends a dblclick, which lands here; it mustn't zoom the picture in.
+  const openedAt = useRef(0)
   // Set by the second tap of a double tap; the close happens on its click, so that click can't reach the page behind.
   const closeTap = useRef<{ x: number; y: number } | null>(null)
   const f = useFrame(cam?.id ?? '')
@@ -47,7 +49,7 @@ export function ZoomView({ cam, onClose }: { cam: Camera | null; onClose: () => 
   const centre = () => { const r = stage.current!.getBoundingClientRect(); return [r.width / 2, r.height / 2] as const }
 
   useEffect(() => {
-    if (cam) { t.current = { s: 1, x: 0, y: 0 }; dlg.current?.showModal(); requestAnimationFrame(() => apply()) }
+    if (cam) { openedAt.current = Date.now(); t.current = { s: 1, x: 0, y: 0 }; dlg.current?.showModal(); requestAnimationFrame(() => apply()) }
     else dlg.current?.close()
   }, [cam])
 
@@ -105,7 +107,7 @@ export function ZoomView({ cam, onClose }: { cam: Camera | null; onClose: () => 
           </div>
           <div ref={stage} className="zv-stage" data-zoomed="false" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
             onClick={(e) => { const c = closeTap.current; closeTap.current = null; if (c && Math.hypot(e.clientX - c.x, e.clientY - c.y) < 12) dlg.current?.close() }}
-            onDoubleClick={(e) => { const [x, y] = local(e); zoomAt(t.current.s > 1.2 ? 1 : 2.5, x, y, true) }}>
+            onDoubleClick={(e) => { if (Date.now() - openedAt.current < 700) return; const [x, y] = local(e); zoomAt(t.current.s > 1.2 ? 1 : 2.5, x, y, true) }}>
             {isLive(cam.id) ? <LiveVideo id={cam.id} alt={`Live video from ${cam.name}`} className="zoom-live" videoRef={(el) => { img.current = el }} />
               : (isStill(cam.id) || f?.url) ? <img ref={(el) => { img.current = el }} src={isStill(cam.id) ? directUrl(cam.id, Math.floor(Date.now() / 60e3)) : f!.url} alt={`Latest picture from ${cam.name}`} draggable={false} /> : <div className="shot-loading" />}
           </div>

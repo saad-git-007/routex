@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { satThumb } from '../lib/api'
 import { km } from '../lib/geo'
 import type { OptimizeBy, Place, Route, TripShape } from '../lib/types'
@@ -34,6 +34,15 @@ export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape
   const arrive = route ? route.legs.reduce<number[]>((a, l) => (a.push((a[a.length - 1] ?? Date.now()) + l.duration * 1000), a), []) : []
   const routeMatches = ordered.length === stops.length && !!route
   const opt = routeMatches ? route.opt : null
+  // After the stops are put in the shortest order, say so for a few seconds.
+  const [done, setDone] = useState('')
+  useEffect(() => {
+    if (!opt || opt.kept || routing) return
+    const saves = opt.reordered && opt.entered - opt.best > 50 ? ` · saves ${cost(opt.by, opt.entered - opt.best)}` : ''
+    setDone(`Route optimized${saves}`)
+    const t = setTimeout(() => setDone(''), 3500)
+    return () => clearTimeout(t)
+  }, [opt, routing])
   const quick = saved.filter((p) => !stops.some((s) => near(s, p)) && !(home && near(home, p)))
 
   return (
@@ -62,18 +71,15 @@ export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape
             <div className="opt-choice">
               <Segmented
                 label="Stop order" value={keepOrder ? 'mine' : 'best'} onChange={(v) => setKeepOrder(v === 'mine')}
-                options={[{ value: 'mine', label: 'My order' }, { value: 'best', label: 'Shortest route' }]}
+                options={[{ value: 'mine', label: 'My stops' }, { value: 'best', label: 'Optimize route' }]}
               />
-              <div className={`opt-note ${routing ? 'is-busy' : ''}`} aria-live="polite">
-                <Icon name={routing ? 'route' : 'check'} size={15} />
-                <p>
-                  {routing ? <span className="shiny">{keepOrder ? 'Routing your stops in the order you added them…' : `Finding the shortest order for ${stops.length} stops…`}</span>
-                    : !opt ? <>Working out the route…</>
-                    : !(opt.reordered && opt.entered - opt.best > 50) ? <>Your order is already the shortest</>
-                    : opt.kept ? <>In the order you added them. The shortest route would save <b>{cost(opt.by, opt.entered - opt.best)}</b></>
-                    : <>Reordered for the shortest drive, saves <b>{cost(opt.by, opt.entered - opt.best)}</b> vs. your order</>}
-                </p>
-              </div>
+              <AnimatePresence>{(done || (routing && !keepOrder)) && (
+                <motion.div key="opt" className={`opt-note ${routing ? 'is-busy' : ''}`} role="status"
+                  initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.25 } }}>
+                  <Icon name={routing ? 'route' : 'check'} size={15} />
+                  <p>{routing ? <span className="shiny">Optimizing {stops.length} stops…</span> : done}</p>
+                </motion.div>
+              )}</AnimatePresence>
             </div>
           )}
           <ol className="stops" aria-label="Stops in driving order">

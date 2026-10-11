@@ -79,8 +79,8 @@ export function RoadNote({ road, className = '' }: { road: RoadCondition | null 
   if (!road) return <p className={`road-note is-none ${className}`}><Icon name="road" size={14} /><span>{NO_REPORT.text}</span></p>
   const extra = [...road.extra, ...(road.visibility && !/good|normal/i.test(road.visibility) ? [`${road.visibility} visibility`] : [])]
   return (
-    <p className={`road-note ${className}`} style={{ color: GRADE_COLOR[roadGrade(road)] }} title={`511 Alberta · ${road.hwy} ${road.segment} · updated ${road.updated}`}>
-      <Icon name="road" size={14} /><span><b>{road.condition}</b>{extra.length ? ` · ${extra.join(', ')}` : ''}<small> · {road.hwy}</small></span>
+    <p className={`road-note ${className}`} style={{ color: GRADE_COLOR[roadGrade(road)] }} title={['511', [road.hwy, road.segment].filter(Boolean).join(' '), road.updated && `updated ${road.updated}`].filter(Boolean).join(' · ')}>
+      <Icon name="road" size={14} /><span><b>{road.condition}</b>{extra.length ? ` · ${extra.join(', ')}` : ''}{road.hwy && <small> · {road.hwy}</small>}</span>
     </p>
   )
 }

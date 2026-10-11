@@ -82,7 +82,7 @@ export function AlertsPanel({ events, roads, highways, route, onShow, onShowRoad
               <li key={r.id} className={roadIsGood(r) ? 'good' : 'bad'} style={{ '--grade': GRADE_COLOR[roadGrade(r)] } as React.CSSProperties}>
                 <button onClick={() => onShowRoad(r)} title="Show on the map">
                   <span className="cond-km tnum">{km(from).replace(' km', '')}–{km(to)}</span>
-                  <span className="cond-main"><b>{r.hwy}</b><small>{r.segment}</small></span>
+                  <span className="cond-main"><b>{r.hwy || r.condition}</b><small>{r.segment}</small></span>
                   <span className="cond-val">{[r.condition, ...r.extra].join(' · ')}{r.visibility && r.visibility !== 'Good' ? <small>Visibility {r.visibility.toLowerCase()}</small> : null}</span>
                 </button>
               </li>

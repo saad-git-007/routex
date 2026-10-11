@@ -9,9 +9,11 @@ import type { Camera, RoadCondition } from '../lib/types'
 import { Freshness, RoadNote, Shot } from './CameraCard'
 import { Icon } from './Icon'
 import { PickMap } from './PickMap'
+import { useWtaRoads } from '../lib/wta'
 import { Segmented } from './Segmented'
 
 const DWELL = 5000
+const NONE: Camera[] = []
 
 type Edit = { id: string | null; name: string; ids: string[] }
 const areaLabel = (c: Camera) => cityOf(c)?.name ?? sourceLabel(c)
@@ -31,8 +33,8 @@ function CitySelect({ cities, value, onPick, label }: { cities: CityRow[]; value
 
 // Full screen, like Before I leave: five cameras spread across a city (or one part of Calgary), one per screen,
 // or a list of cameras the viewer picked on a map and saved in this browser.
-export function AreaShow({ open, onClose, cameras, roads, cityKey, area, setArea, lists, setLists, listId, setListId, onZoom }: {
-  open: boolean; onClose: () => void; cameras: Camera[]; roads: RoadCondition[]
+export function AreaShow({ open, onClose, cameras, roads: abRoads, prov, cityKey, area, setArea, lists, setLists, listId, setListId, onZoom }: {
+  open: boolean; onClose: () => void; cameras: Camera[]; roads: RoadCondition[]; prov: string
   cityKey: string | null; area: Area; setArea: (a: Area) => void
   lists: CamList[]; setLists: (f: (l: CamList[]) => CamList[]) => void; listId: string | null; setListId: (id: string | null) => void
   onZoom: (c: Camera) => void
@@ -59,6 +61,9 @@ export function AreaShow({ open, onClose, cameras, roads, cityKey, area, setArea
   const listCams = useMemo(() => (list ? list.ids.map((id) => byId.get(id)).filter((c): c is Camera => !!c) : []), [list, byId])
   const areaCams = useMemo(() => spread(inArea.filter((c) => !offline.includes(c.id))), [inArea, offline])
   const cams = list ? listCams : areaCams
+  // Outside Alberta, road conditions load from the 511 map tiles around the cameras on show.
+  const near = useWtaRoads(prov, open ? cams : NONE, null).near
+  const roads = prov === 'ab' ? abRoads : near
   const title = isCgy ? QUADRANTS.find((a) => a.key === area)!.label : view?.name ?? 'Areas'
 
   // Building or editing a list: a map of every camera, tap to add or remove.

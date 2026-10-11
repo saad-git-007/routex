@@ -8,6 +8,7 @@ import { ripple } from './lib/ripple'
 import { useLiveLocation } from './lib/useLocation'
 import type { CamList } from './lib/lists'
 import { useStored } from './lib/store'
+import { useWtaRoads, type View } from './lib/wta'
 import { useBump } from './lib/useSeen'
 import { AnimatePresence } from 'motion/react'
 import type { Camera, Community, OnRoute, OptimizeBy, Place, RoadEvent, Route, TripShape, Weather } from './lib/types'
@@ -122,7 +123,7 @@ export default function App() {
   }
   const evData = usePoll(() => fetchEvents(prov), 120_000, [prov])
   const roadData = usePoll(() => fetchRoads(prov), 600_000, [prov])
-  const roads = roadData?.roads ?? []
+  const abRoads = roadData?.roads ?? []
   const events = evData?.events ?? []
   const alerts = evData?.alerts ?? []
   const [alertOpen, setAlertOpen] = useState(false)
@@ -150,6 +151,20 @@ export default function App() {
   }, [routeError]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const routeCamsAll = useMemo(() => (route ? onRoute(route, cameras, CAM_RADIUS) : []), [route, cameras])
+  // Outside Alberta, road conditions come from the 511 map tiles around the route, its cameras and the open camera.
+  const [mapView, setMapView] = useState<View | null>(null)
+  const wtaPoints = useMemo(() => {
+    if (prov === 'ab') return []
+    const pts: { lat: number; lon: number }[] = []
+    if (route) for (let i = 0; i < route.coords.length; i += Math.max(1, Math.floor(route.coords.length / 80))) pts.push({ lat: route.coords[i][0], lon: route.coords[i][1] })
+    pts.push(...routeCamsAll)
+    const open = sheet ? cameras.find((c) => c.id === sheet) : undefined
+    if (open) pts.push(open)
+    return pts
+  }, [prov, route, routeCamsAll, sheet, cameras])
+  const wta = useWtaRoads(prov, wtaPoints, vis.allRoads ? mapView : null)
+  const roads = prov === 'ab' ? abRoads : wta.near
+  const allRoads = prov === 'ab' ? abRoads : wta.overlay
   const routeEventsAll = useMemo(() => (route ? onRoute(route, events, CAM_RADIUS) : []), [route, events])
   const routeEventIds = useMemo(() => new Set(routeEventsAll.map((e) => e.id)), [routeEventsAll])
   // What's shown follows the layer switches.
@@ -238,11 +253,11 @@ export default function App() {
     ? {
         city: routeCamsAll.filter((c) => c.src === 'city').length, ab: routeCamsAll.filter((c) => c.src === 'ab').length, town: routeCamsAll.filter((c) => c.src === 'town').length, others: cameras.length - routeCamsAll.length,
         incident: routeEventsAll.filter((e) => e.kind === 'incident').length, closure: routeEventsAll.filter((e) => e.kind === 'closure').length,
-        construction: routeEventsAll.filter((e) => e.kind === 'construction').length, roads: routeRoads.length, allRoads: roads.length,
+        construction: routeEventsAll.filter((e) => e.kind === 'construction').length, roads: routeRoads.length, allRoads: allRoads.length,
       }
     : {
         city: cameras.filter((c) => c.src === 'city').length, ab: cameras.filter((c) => c.src === 'ab').length, town: cameras.filter((c) => c.src === 'town').length,
-        incident: events.filter((e) => e.kind === 'incident').length, closure: events.filter((e) => e.kind === 'closure').length, construction: events.filter((e) => e.kind === 'construction').length, allRoads: roads.length,
+        incident: events.filter((e) => e.kind === 'incident').length, closure: events.filter((e) => e.kind === 'closure').length, construction: events.filter((e) => e.kind === 'construction').length, allRoads: allRoads.length,
       }
   const shownRoads = vis.roads ? routeRoads : []
 
@@ -288,13 +303,13 @@ export default function App() {
       <main className="layout">
         <div className={`map-col ${full ? 'is-full' : ''}`} ref={mapCol}>
           <MapView
-            cameras={mapCameras} routeCams={routeCams} route={route} events={mapEvents} routeEventIds={routeEventIds} routeRoads={shownRoads} allRoads={vis.allRoads ? roads : []}
+            cameras={mapCameras} routeCams={routeCams} route={route} events={mapEvents} routeEventIds={routeEventIds} routeRoads={shownRoads} allRoads={vis.allRoads ? allRoads : []} onView={setMapView}
             basemap={basemap} communities={names ? communities ?? [] : []} me={fix}
             home={home} start={city ? { lat: city.lat, lon: city.lon, zoom: cityZoom(city) } : null} activeCam={active} focusAlong={focusAlong}
             onCam={onCam} onEvent={onEvent}
             onAddStop={(p) => setStops((s) => [...s, p])} onSetHome={setHome} flyTo={flyTo}
           />
-          <MapLayers vis={vis} setVis={setVis} counts={layerCounts} hasTrip={hasTrip} prov={prov} grades={[...shownRoads, ...(vis.allRoads ? roads : [])].map(roadGrade)}
+          <MapLayers vis={vis} setVis={setVis} counts={layerCounts} hasTrip={hasTrip} prov={prov} grades={[...shownRoads, ...(vis.allRoads ? allRoads : [])].map(roadGrade)}
             basemap={basemap} setBasemap={setBasemap} names={names} setNames={setNames} namesCount={communities?.length} />
           <div className="map-tools">
             {full && hasTrip && (
@@ -397,7 +412,7 @@ export default function App() {
       <ZoomView cam={zoom} onClose={() => setZoom(null)} />
       <CityPicker open={cityOpen} first={cityKey == null} current={cityKey} onPick={pickCity}
         onClose={() => { setCityOpen(false); if (cityKey == null) setCityKey('calgary') }} />
-      <AreaShow open={areasOpen} onClose={() => setAreasOpen(false)} cameras={cameras} roads={roads} cityKey={cityKey} area={area} setArea={setArea}
+      <AreaShow open={areasOpen} onClose={() => setAreasOpen(false)} cameras={cameras} roads={roads} prov={prov} cityKey={cityKey} area={area} setArea={setArea}
         lists={camLists} setLists={setCamLists} listId={listId} setListId={setListId} onZoom={setZoom} />
       {route && <BeforeILeave open={leaving} onClose={() => setLeaving(false)} route={route} cams={routeCams} events={routeEvents as OnRoute<RoadEvent>[]} camRoads={camRoads} weather={weather} level={level} reasons={reasons} onZoom={setZoom} />}
     </div>

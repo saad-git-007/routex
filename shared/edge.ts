@@ -16,7 +16,7 @@ export const json = (body: unknown, maxAge: number, extra: Record<string, string
 export async function cached(ctx: { request: Request; waitUntil(p: Promise<unknown>): void }, ttl: number, build: () => Promise<unknown>) {
   const cache = (caches as unknown as { default: Cache }).default
   const u = new URL(ctx.request.url)
-  u.searchParams.set('_v', '7') // bump when a response shape changes
+  u.searchParams.set('_v', '8') // bump when a response shape changes
   const key = new Request(u.toString(), { method: 'GET' })
   const hit = await cache.match(key)
   if (hit) return new Response(hit.body, { headers: { ...Object.fromEntries(hit.headers), 'x-edge': 'hit' } })
@@ -61,7 +61,7 @@ export function decodePolyline(s: string): [number, number][] {
 }
 
 /** Douglas–Peucker, in degrees (longitude scaled to Alberta's latitude). Highways are long and straight, so this drops most points. */
-function simplify(pts: [number, number][], tol: number): [number, number][] {
+export function simplify(pts: [number, number][], tol: number): [number, number][] {
   if (pts.length < 3) return pts
   const k = 0.62, keep = new Uint8Array(pts.length)
   keep[0] = keep[pts.length - 1] = 1

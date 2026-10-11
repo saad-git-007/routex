@@ -44,8 +44,9 @@ export const GRADE_COLOR = Object.fromEntries(GRADES.map((g) => [g.key, g.color]
 export function roadGrade(r: RoadCondition): Grade {
   const c = r.condition.toLowerCase()
   if (/closed|not recommended|impassable/.test(c)) return 'closed'
-  if (/partl|partial|patch|track|centre bare|center bare/.test(c)) return 'partly'
+  if (/partl|partial|patch|track|centre bare|center bare|difficult|advisory/.test(c)) return 'partly'
   if (/cover|packed|snow|ice|icy|slush|drift/.test(c)) return 'covered'
+  if (/bare.*(dry.*wet|wet.*dry)/.test(c)) return 'dry' // "Bare Wet/Dry": other provinces' bare, either way
   if (/wet/.test(c)) return 'wet'
   if (/bare|dry|seasonal|good/.test(c)) return 'dry'
   return 'unknown'

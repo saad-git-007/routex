@@ -34,6 +34,7 @@ type Props = {
   cameras: Camera[]; routeCams: OnRoute<Camera>[]; route: Route | null; events: RoadEvent[]; routeEventIds: Set<string>; routeRoads: RoadCondition[]
   allRoads: RoadCondition[]
   basemap: Basemap; communities: Community[]; me: Fix | null
+  onView?: (v: { w: number; s: number; e: number; n: number; zoom: number }) => void
   home: Place | null; start: { lat: number; lon: number; zoom: number } | null; activeCam: string | null; focusAlong: number | null
   onCam: (id: string) => void; onEvent: (id: string) => void
   onAddStop: (p: Place) => void; onSetHome: (p: Place) => void
@@ -43,6 +44,9 @@ type Props = {
 const EVENT_GLYPH: Record<RoadEvent['kind'], string> = { incident: '!', closure: '⨯', construction: '▲' }
 
 export function MapView(p: Props) {
+  // Within 300 km of the chosen city (or no city chosen): the map may follow home and the trip there.
+  const nearStart = (q: { lat: number; lon: number } | null | undefined) =>
+    !!q && (!p.start || Math.hypot(q.lat - p.start.lat, (q.lon - p.start.lon) * Math.cos((q.lat * Math.PI) / 180)) * 111 < 300)
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map>()
   const layers = useRef<Record<string, L.LayerGroup>>({})
@@ -69,7 +73,7 @@ export function MapView(p: Props) {
 
   // ── init ──
   useEffect(() => {
-    const m = L.map(el.current!, { zoomControl: false, preferCanvas: true, attributionControl: true, zoomSnap: 0.25, minZoom: 5 }).setView(p.home ? [p.home.lat, p.home.lon] : p.start ? [p.start.lat, p.start.lon] : CALGARY, p.home ? 12 : p.start?.zoom ?? 11)
+    const m = L.map(el.current!, { zoomControl: false, preferCanvas: true, attributionControl: true, zoomSnap: 0.25, minZoom: 5 }).setView(nearStart(p.home) ? [p.home!.lat, p.home!.lon] : p.start ? [p.start.lat, p.start.lon] : CALGARY, nearStart(p.home) ? 12 : p.start?.zoom ?? 11)
     L.control.zoom({ position: 'bottomright' }).addTo(m)
     m.attributionControl.setPrefix(false)
     m.createPane('labels').style.zIndex = '405'
@@ -78,6 +82,9 @@ export function MapView(p: Props) {
     // Community names thin out as you zoom out, so the city view stays readable.
     const zoomClass = () => { const z = m.getZoom(); el.current!.dataset.z = z >= 13 ? 'near' : z >= 11.5 ? 'mid' : z >= 10.5 ? 'far' : 'out' }
     m.on('zoomend', () => { zoomClass(); declutter() }); zoomClass()
+    // Tell the app what's on screen (it loads road conditions for the visible map outside Alberta).
+    const view = () => { const b = m.getBounds(); cb.current.onView?.({ w: b.getWest(), s: b.getSouth(), e: b.getEast(), n: b.getNorth(), zoom: m.getZoom() }) }
+    m.on('moveend', view); setTimeout(view)
     for (const k of ['communities', 'allRoads', 'all', 'roads', 'route', 'progress', 'events', 'places', 'routeCams']) layers.current[k] = L.layerGroup().addTo(m)
 
     m.on('click', async (e) => {
@@ -144,8 +151,8 @@ export function MapView(p: Props) {
     const m = map.current!, g = layers.current.route, pl = layers.current.places
     g.clearLayers(); pl.clearLayers()
     if (p.home) L.marker([p.home.lat, p.home.lon], { icon: L.divIcon({ className: 'mk-home', html: '<span>⌂</span>', iconSize: [34, 34] }), zIndexOffset: 900 }).bindTooltip(p.home.label, { className: 'tip', direction: 'top', offset: [0, -16] }).addTo(pl)
-    // No trip yet: keep the map on home, wherever in Alberta that is.
-    if (!p.route) { if (p.home) m.flyTo([p.home.lat, p.home.lon], Math.max(m.getZoom(), 12), { duration: 0.8 }); return }
+    // No trip yet: keep the map on home. A home or trip in another part of Canada than the chosen city stays put.
+    if (!p.route) { if (p.home && nearStart(p.home)) m.flyTo([p.home.lat, p.home.lon], Math.max(m.getZoom(), 12), { duration: 0.8 }); return }
     const ll = p.route.coords
     // Lines draw on canvas (no CSS filters), so the glow is a wide, faint cyan stroke underneath.
     L.polyline(ll, { pane: 'route', color: '#4cc9f0', opacity: 0.2, weight: 18, lineJoin: 'round', lineCap: 'round', interactive: false }).addTo(g)
@@ -153,7 +160,8 @@ export function MapView(p: Props) {
     L.polyline(ll, { pane: 'route', color: '#5fd4f5', opacity: 1, weight: 5, lineJoin: 'round', lineCap: 'round', interactive: false }).addTo(g)
     const stops = p.route.order.slice(1).filter((s) => s.id !== p.home?.id)
     stops.forEach((s, i) => L.marker([s.lat, s.lon], { icon: L.divIcon({ className: 'mk-stop', html: `<span>${i + 1}</span>`, iconSize: [30, 30] }), zIndexOffset: 800 }).bindTooltip(s.label, { className: 'tip', direction: 'top', offset: [0, -14] }).addTo(pl))
-    m.flyToBounds(L.latLngBounds(ll), { padding: [40, 40], duration: 0.8 })
+    const b = L.latLngBounds(ll)
+    if (nearStart({ lat: b.getCenter().lat, lon: b.getCenter().lng })) m.flyToBounds(b, { padding: [40, 40], duration: 0.8 })
   }, [p.route, p.home])
 
   // ── 511 highway conditions along the route: a coloured halo under the route line ──
@@ -163,7 +171,7 @@ export function MapView(p: Props) {
     for (const r of p.routeRoads) {
       if (!r.line?.length) continue
       L.polyline(r.line, { pane: 'route', color: GRADE_COLOR[roadGrade(r)], weight: 20, opacity: 0.75, lineCap: 'butt', lineJoin: 'round' })
-        .bindTooltip(`${r.hwy} · ${r.condition}${r.extra.length ? ' · ' + r.extra.join(', ') : ''}`, { className: 'tip', sticky: true })
+        .bindTooltip([r.hwy, r.condition, ...r.extra].filter(Boolean).join(' · '), { className: 'tip', sticky: true })
         .addTo(g).bringToBack()
     }
   }, [p.routeRoads])
@@ -177,7 +185,7 @@ export function MapView(p: Props) {
       if (!r.line?.length) continue
       const grade = roadGrade(r)
       L.polyline(r.line, { renderer, color: GRADE_COLOR[grade], weight: grade === 'dry' ? 4 : 5, opacity: 0.9, lineCap: 'round' })
-        .bindTooltip(`${r.hwy} · ${r.segment}<br><b>${[r.condition, ...r.extra].join(' · ')}</b>`, { className: 'tip', sticky: true })
+        .bindTooltip(`${[r.hwy, r.segment].filter(Boolean).join(' · ')}${r.hwy || r.segment ? '<br>' : ''}<b>${[r.condition, ...r.extra].join(' · ')}</b>`, { className: 'tip', sticky: true })
         .addTo(g)
     }
   }, [p.allRoads])

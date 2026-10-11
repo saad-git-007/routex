@@ -1,6 +1,6 @@
 # RouteX
 
-**See the road before you drive it.** RouteX puts every live traffic camera, incident, closure and highway condition on your drive in one place: across Alberta and the Greater Toronto Area so far, in driving order.
+**See the road before you drive it.** RouteX puts every live traffic camera, incident, closure and highway condition on your drive in one place, across Canada: every province with public cameras except Québec, plus Yukon, in driving order.
 
 **Live:** https://routex-ca.pages.dev
 
@@ -15,7 +15,7 @@
 - **Conditions along the route.** A strip showing each highway stretch's condition by kilometre, plus colour bands on the map.
 - **Weather.** Forecast at home, each stop and along the way (Open-Meteo), plus 511 road weather stations.
 - **Before I leave.** A full-screen, auto-advancing look at every camera on the route, one per screen.
-- **Pick your city.** First-time visitors choose a city (Alberta or the Greater Toronto Area) from a searchable list or a drop-down; the map, search and data follow it.
+- **Pick your city.** A short welcome explains the app and offers one search across every Canadian city with cameras (or "Use my location"); the map, search and data follow it.
 - **Areas.** Five cameras spread evenly across your city (or one part of Calgary: NW, NE, Core, SW, SE), for a quick overview without a route.
 - **Your own camera lists.** Pick cameras on a map, name the list, and play it back like an area. Lists stay in your browser.
 - **Take it with you.** Save and favourite routes in the browser, open the whole trip in Google Maps with stops in order, download GPX, or share a link that rebuilds the trip.
@@ -40,6 +40,8 @@ The Pages Functions fetch and normalise the public feeds behind Cloudflare's edg
 - **511 Alberta API:** cameras, events, winter road conditions, road weather stations and alerts, province-wide
 - **City of Edmonton:** live HLS traffic video, listed by [edmontontrafficcam.com](https://edmontontrafficcam.com)
 - **Town of Banff:** street camera pictures from [banff.ca](https://banff.ca/1065/Traffic-Cameras), placed on the map by hand
+- **British Columbia:** [DriveBC](https://www.drivebc.ca) cameras and [Open511](https://api.open511.gov.bc.ca) events, City of Surrey cameras
+- **Ontario, Saskatchewan, Manitoba, Atlantic Canada, Yukon:** the provincial 511 sites (cameras, events, and winter road conditions read from their map tiles), plus the City of Ottawa's cameras
 - **Greater Toronto Area:** [Ontario 511](https://511on.ca) highway cameras and events, [City of Toronto Open Data](https://open.toronto.ca/dataset/traffic-cameras/) cameras and road restrictions (Open Government Licence – Toronto), and [York Region](https://www.york.ca/transportation/roads/traffic-cameras) cameras
 - **Open-Meteo:** weather forecast
 - **OSRM:** driving routes and the distance table

@@ -827,3 +827,5 @@ html.is-map-full, html.is-map-full body { overflow: hidden; }
 .city-list { flex: none; min-height: 0; height: 248px; max-height: none; }
 .city-list .city-hint { font-size: .66rem; }
 @media (max-width: 420px) { .city-card h2 { font-size: 1.35rem; } .city-list { height: 210px; } }
+.pick-address { margin-top: 10px; }
+.pick-address .search { width: 100%; }

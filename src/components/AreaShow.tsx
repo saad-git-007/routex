@@ -8,6 +8,7 @@ import type { CamList } from '../lib/lists'
 import type { Camera, RoadCondition } from '../lib/types'
 import { Freshness, RoadNote, Shot } from './CameraCard'
 import { Icon } from './Icon'
+import { AddressSearch } from './AddressSearch'
 import { PickMap } from './PickMap'
 import { useWtaRoads } from '../lib/wta'
 import { Segmented } from './Segmented'
@@ -70,9 +71,10 @@ export function AreaShow({ open, onClose, cameras, roads: abRoads, prov, cityKey
   const [edit, setEdit] = useState<Edit | null>(null)
   const [focus, setFocus] = useState<string | null>(null)
   const [jump, setJump] = useState<{ city: string; quad: Area | '' }>({ city: '', quad: '' })
+  const [pin, setPin] = useState<{ lat: number; lon: number; label: string } | null>(null)
   const [pickView, setPickView] = useState<{ center: [number, number]; zoom: number; n: number } | null>(null)
   const startEdit = (l?: CamList) => {
-    setEdit(l ? { id: l.id, name: l.name, ids: [...l.ids] } : { id: null, name: '', ids: [] }); setFocus(null); setPlaying(false)
+    setEdit(l ? { id: l.id, name: l.name, ids: [...l.ids] } : { id: null, name: '', ids: [] }); setFocus(null); setPin(null); setPlaying(false)
     if (view) jumpCity(view.key)
   }
   const toggle = (id: string) => {
@@ -155,6 +157,9 @@ export function AreaShow({ open, onClose, cameras, roads: abRoads, prov, cityKey
                 onChange={(e) => setEdit({ ...edit, name: e.target.value })} aria-label="List name" />
               <CitySelect cities={cities} value={jump.city || view?.key || ''} onPick={jumpCity} label="Jump to a city" />
               {(jump.city || view?.key) === 'calgary' && <Segmented label="Jump to part of Calgary" className="area-seg" value={jump.quad as Area} options={QUADRANTS.map((a) => ({ value: a.key, label: a.short }))} onChange={jumpQuad} />}
+              <div className="pick-address">
+                <AddressSearch placeholder="Go to an address" onPick={(p) => { setPin({ lat: p.lat, lon: p.lon, label: p.label }); setPickView({ center: [p.lat, p.lon], zoom: 15, n: Date.now() }) }} />
+              </div>
               <p className="pick-hint">Tap cameras on the map to add them. Tap again to take one off.</p>
             </div>
             <ol className="pick-list" aria-label="Cameras in this list">
@@ -174,7 +179,7 @@ export function AreaShow({ open, onClose, cameras, roads: abRoads, prov, cityKey
           </aside>
 
           <div className="pick-stage">
-            <PickMap cameras={cameras} picked={edit.ids} focus={focus} onPick={toggle} view={pickView} />
+            <PickMap cameras={cameras} picked={edit.ids} focus={focus} onPick={toggle} view={pickView} pin={pin} />
             {focused && (
               <div className="pick-preview">
                 <Shot id={focused.id} alt={`Latest picture from ${focused.name}`} className="pick-shot" />

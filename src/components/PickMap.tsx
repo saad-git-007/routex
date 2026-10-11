@@ -5,9 +5,10 @@ import type { Camera } from '../lib/types'
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services'
 
 // A map of every camera for building a list: tap a camera to add it (numbered) or take it off again.
-export function PickMap({ cameras, picked, focus, onPick, view }: {
+export function PickMap({ cameras, picked, focus, onPick, view, pin }: {
   cameras: Camera[]; picked: string[]; focus: string | null; onPick: (id: string) => void
   view: { center: [number, number]; zoom: number; n: number } | null
+  pin?: { lat: number; lon: number; label: string } | null
 }) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map>()
@@ -44,6 +45,14 @@ export function PickMap({ cameras, picked, focus, onPick, view }: {
         .addTo(g)
     }
   }, [cameras, picked, focus])
+
+  // The searched address, so the cameras around it are easy to see.
+  useEffect(() => {
+    if (!pin || !map.current) return
+    const mk = L.marker([pin.lat, pin.lon], { icon: L.divIcon({ className: 'mk-home', html: '<span>⌖</span>', iconSize: [30, 30] }), interactive: false, zIndexOffset: -100 })
+      .bindTooltip(pin.label, { className: 'tip', direction: 'top', offset: [0, -14], permanent: true }).addTo(map.current)
+    return () => { mk.remove() }
+  }, [pin])
 
   useEffect(() => {
     if (view && map.current) map.current.flyTo(view.center, view.zoom, { duration: 0.6 })

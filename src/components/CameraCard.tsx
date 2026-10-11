@@ -5,7 +5,7 @@ import { ago, kmIn } from '../lib/geo'
 import type { Camera, OnRoute, RoadCondition } from '../lib/types'
 import { useNow } from '../lib/useNow'
 import { Icon } from './Icon'
-import { directUrl, isStill, isDirect, isLive } from '../lib/live'
+import { directUrl, isStill, isLive } from '../lib/live'
 import { LiveVideo } from './LiveVideo'
 
 export const STALE_MS = 15 * 60e3
@@ -85,9 +85,9 @@ export function RoadNote({ road, className = '' }: { road: RoadCondition | null 
   )
 }
 
-export function CameraCard({ cam, index, legLabel, road, active, onSelect, onTimelapse, onZoom, cardRef }: {
+export function CameraCard({ cam, index, legLabel, road, active, onSelect, onZoom, cardRef }: {
   cam: OnRoute<Camera>; index: number; legLabel: string; road: RoadCondition | null | undefined; active: boolean
-  onSelect: () => void; onTimelapse: () => void; onZoom: () => void; cardRef?: (el: HTMLElement | null) => void
+  onSelect: () => void; onZoom: () => void; cardRef?: (el: HTMLElement | null) => void
 }) {
   return (
     <div className={`magic cam-card ${active ? 'is-active' : ''}`} data-cam={cam.id} ref={cardRef}>
@@ -104,7 +104,6 @@ export function CameraCard({ cam, index, legLabel, road, active, onSelect, onTim
           <RoadNote road={road} />
         </div>
         <button className="btn-icon btn-xs" onClick={onZoom} aria-label={`Zoom into ${cam.name}`} title="Zoom into the picture"><Icon name="zoomin" size={16} /></button>
-        {!isDirect(cam.id) && <button className="btn-ghost btn-sm" onClick={onTimelapse} title="Time-lapse of the last hours"><Icon name="film" size={15} /> <span className="cam-tl-label">Time-lapse</span></button>}
       </div>
     </div>
   )

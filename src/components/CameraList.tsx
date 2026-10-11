@@ -4,9 +4,9 @@ import { CameraCard } from './CameraCard'
 
 // Route cameras in driving order. Scrolling the list "drives" the map: the card crossing the middle of the
 // screen becomes active, its marker pings and the route lights up to it.
-export function CameraList({ cams, route, roads, active, setActive, scrollTo, onTimelapse, onZoom }: {
+export function CameraList({ cams, route, roads, active, setActive, scrollTo, onZoom }: {
   cams: OnRoute<Camera>[]; route: Route; roads: Map<string, RoadCondition | null>; active: string | null; setActive: (id: string) => void
-  scrollTo: { id: string; n: number } | null; onTimelapse: (c: Camera) => void; onZoom: (c: Camera) => void
+  scrollTo: { id: string; n: number } | null; onZoom: (c: Camera) => void
 }) {
   const nodes = useRef(new Map<string, HTMLElement>())
   const quietUntil = useRef(0)
@@ -46,7 +46,6 @@ export function CameraList({ cams, route, roads, active, setActive, scrollTo, on
             cam={c} index={i} active={c.id === active} legLabel={legLabel(c.leg)} road={roads.get(c.id)}
             cardRef={(el) => { if (el) nodes.current.set(c.id, el); else nodes.current.delete(c.id) }}
             onSelect={() => { quietUntil.current = Date.now() + 900; setActive(c.id) }}
-            onTimelapse={() => onTimelapse(c)}
             onZoom={() => onZoom(c)}
           />
         </li>

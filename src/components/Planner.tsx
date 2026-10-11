@@ -85,7 +85,7 @@ export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape
                     className={isOpen ? 'is-open' : ''}
                   >
                     <div className="stop-row">
-                      <span className="node">S{i + 1}</span>
+                      <span className="node">D{i + 1}</span>
                       <button className="stop-main" aria-expanded={isOpen} onClick={() => { setOpen(isOpen ? null : p.id); if (!isOpen) onFocus(p) }}>
                         <span className="stop-label">{p.label.split(',')[0]}</span>
                         <span className="stop-meta tnum">
@@ -108,7 +108,7 @@ export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape
                     <AnimatePresence initial={false}>{isOpen && (
                       <motion.div className="stop-preview-wrap" initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0, transition: { duration: 0.16, ease: [0.77, 0, 0.175, 1] } }} transition={{ type: 'spring', stiffness: 360, damping: 32, mass: 0.6 }}>
                       <div className="stop-preview">
-                        <div className="stop-sat"><img src={satThumb(p.lat, p.lon)} alt={`Satellite view of ${p.label}`} loading="lazy" /><i aria-hidden>S{i + 1}</i></div>
+                        <div className="stop-sat"><img src={satThumb(p.lat, p.lon)} alt={`Satellite view of ${p.label}`} loading="lazy" /><i aria-hidden>D{i + 1}</i></div>
                         <p>{p.label}</p>
                         {leg && <p className="stop-meta tnum">Stop {i + 1} of {list.length} · from {i === 0 ? 'home' : list[i - 1].label.split(',')[0]}</p>}
                       </div>

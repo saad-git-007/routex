@@ -2,11 +2,11 @@ import { useEffect, useSyncExternalStore } from 'react'
 import { isDirect } from './live'
 
 // Camera pictures. One batched call a minute for every camera on screen; only pictures newer than what we hold
-// come back. Each new picture is also kept in IndexedDB for the time-lapse (last 6 h, up to 120 per camera).
+// come back. The latest picture of each camera is kept in IndexedDB, so cards never start empty after a reload.
 
 export const PERIOD = 60_000
 const BATCH = 40
-const KEEP = 120, KEEP_MS = 6 * 3600e3
+const KEEP = 1, KEEP_MS = 6 * 3600e3
 
 export type Frame = { url: string; lm: number; checked: number; error?: boolean }
 type Snapshot = { frames: Map<string, Frame>; nextAt: number; busy: boolean; lastAt: number }
@@ -50,7 +50,7 @@ async function store(id: string, lm: number, blob: Blob) {
   } catch { /* quota or private mode */ }
 }
 
-export async function history(id: string): Promise<{ lm: number; blob: Blob }[]> {
+async function history(id: string): Promise<{ lm: number; blob: Blob }[]> {
   const d = await db()
   if (!d) return []
   return new Promise((res) => {

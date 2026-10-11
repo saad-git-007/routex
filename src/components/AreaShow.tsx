@@ -113,7 +113,7 @@ export function AreaShow({ open, onClose, cameras, roads: abRoads, prov, cityKey
     if (!root || !open || edit) return
     const io = new IntersectionObserver((es) => {
       const e = es.find((x) => x.isIntersecting)
-      if (e) setI(+(e.target as HTMLElement).dataset.i!)
+      if (e) { setI(+(e.target as HTMLElement).dataset.i!); setCycle((c) => c + 1); setPlaying(!matchMedia('(prefers-reduced-motion: reduce)').matches) }
     }, { root, threshold: 0.6 })
     root.querySelectorAll('[data-i]').forEach((n) => io.observe(n))
     return () => io.disconnect()
@@ -122,7 +122,7 @@ export function AreaShow({ open, onClose, cameras, roads: abRoads, prov, cityKey
   const go = (n: number) => {
     const t = Math.max(0, Math.min(cams.length - 1, n))
     scroller.current?.querySelector(`[data-i="${t}"]`)?.scrollIntoView({ behavior: reduced() ? 'auto' : 'smooth', block: 'start' })
-    setI(t); setCycle((c) => c + 1)
+    setI(t); setCycle((c) => c + 1); setPlaying(!matchMedia('(prefers-reduced-motion: reduce)').matches)
   }
   useEffect(() => {
     if (!open || edit || !playing || !cams.length) return
@@ -145,8 +145,8 @@ export function AreaShow({ open, onClose, cameras, roads: abRoads, prov, cityKey
   return (
     <dialog ref={dlg} className={`bil areashow ${edit ? 'is-editing' : ''}`} onClose={onClose} onKeyDown={(e) => {
       if (edit) return
-      if (['ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); setPlaying(false); go(i + 1) }
-      if (['ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); setPlaying(false); go(i - 1) }
+      if (['ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(i + 1) }
+      if (['ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); go(i - 1) }
     }}>
       {open && edit && (
         <>
@@ -233,13 +233,13 @@ export function AreaShow({ open, onClose, cameras, roads: abRoads, prov, cityKey
                 {!list && inArea.map((c) => { const [x, y] = mini.xy(c); return <circle key={c.id} cx={x} cy={y} r={0.9} className="area-other" /> })}
                 {cams.map((c, j) => {
                   const [x, y] = mini.xy(c)
-                  return <circle key={c.id} cx={x} cy={y} r={j === i ? 3 : 2.2} className={j === i ? 'on' : ''} onClick={() => { setPlaying(false); go(j) }} />
+                  return <circle key={c.id} cx={x} cy={y} r={j === i ? 3 : 2.2} className={j === i ? 'on' : ''} onClick={() => { go(j) }} />
                 })}
               </svg>
             )}
             <ol className="bil-dots" aria-label="Cameras">
               {cams.map((c, j) => (
-                <li key={c.id}><button aria-current={j === i} onClick={() => { setPlaying(false); go(j) }} title={c.name}><span className="tnum">{j + 1}</span>{c.name}</button></li>
+                <li key={c.id}><button aria-current={j === i} onClick={() => { go(j) }} title={c.name}><span className="tnum">{j + 1}</span>{c.name}</button></li>
               ))}
             </ol>
           </aside>
@@ -263,11 +263,9 @@ export function AreaShow({ open, onClose, cameras, roads: abRoads, prov, cityKey
           </div>
 
           <div className="bil-bar">
-            <button className="btn-icon" onClick={() => { setPlaying(false); go(i - 1) }} aria-label="Previous camera" disabled={i === 0}><Icon name="up" /></button>
-            <button className="btn-accent btn-round" onClick={() => { if (!playing && i >= cams.length - 1) go(0); setPlaying(!playing) }} aria-label={playing ? 'Pause' : 'Play'}>
-              <Icon name={playing ? 'pause' : 'play'} size={16} fill />
-            </button>
-            <button className="btn-icon" onClick={() => { setPlaying(false); go(i + 1) }} aria-label="Next camera" disabled={i >= cams.length - 1}><Icon name="down" /></button>
+            <button className="btn-icon bil-step" onClick={() => go(i - 1)} aria-label="Previous camera" disabled={i === 0}><Icon name="up" /></button>
+            <button className="btn-icon bil-step" onClick={() => go(i + 1)} aria-label="Next camera" disabled={i >= cams.length - 1}><Icon name="down" /></button>
+            <span className="bil-swipe" aria-hidden><Icon name="swipe" size={18} /> Swipe up or down</span>
             <span className="bil-progress" aria-hidden>{playing && <i key={`${listId ?? area}-${i}-${cycle}`} style={{ animationDuration: `${DWELL}ms` }} />}</span>
             <button className="btn-icon" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" /></button>
           </div>

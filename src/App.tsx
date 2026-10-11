@@ -29,7 +29,6 @@ import { CityPicker } from './components/CityPicker'
 import { CITIES, PROVINCES, cityZoom, type City, type Province } from './lib/cities'
 import { Planner } from './components/Planner'
 import { Segmented } from './components/Segmented'
-import { Timelapse } from './components/Timelapse'
 import { WeatherPanel } from './components/WeatherPanel'
 import { DotPattern } from './components/magic/DotPattern'
 import { NumberTicker } from './components/magic/NumberTicker'
@@ -92,7 +91,6 @@ export default function App() {
   const [savedRoutes, setSavedRoutes] = useStored<SavedRoute[]>('routes', [])
   const [full, setFull] = useState(false)
   const mapCol = useRef<HTMLDivElement>(null)
-  const [lapse, setLapse] = useState<Camera | null>(null)
   const [leaving, setLeaving] = useState(false)
   const [areasOpen, setAreasOpen] = useState(false)
   // The city to look at. Unset means a first visit, which opens the city question.
@@ -296,8 +294,8 @@ export default function App() {
           <button className="btn-areas has-rpl" onPointerDown={ripple} onClick={() => setAreasOpen(true)} aria-label="Areas: five cameras spread across a part of the city" title="Areas">
             <Icon name="camera" size={16} /><span>Areas</span>
           </button>
-          <button className="btn-accent btn-leave has-rpl" onPointerDown={ripple} disabled={!routeCams.length} onClick={() => setLeaving(true)} aria-label="See cameras on your route, full screen">
-            <Icon name="play" size={14} fill /> <span>See cameras on your route</span>
+          <button className="btn-leave has-rpl" onPointerDown={ripple} disabled={!routeCams.length} onClick={() => setLeaving(true)} aria-label="See cameras on your route, full screen">
+            <Icon name="play" size={14} fill /><span>See cameras on your route</span>
           </button>
         </div>
       </header>
@@ -339,7 +337,6 @@ export default function App() {
               onPrev={sheetIdx > 0 ? () => stepSheet(-1) : undefined}
               onNext={sheetIdx >= 0 && sheetIdx < routeCams.length - 1 ? () => stepSheet(1) : undefined}
               onClose={() => setSheet(null)}
-              onTimelapse={() => setLapse(sheetCam)}
               onZoom={() => setZoom(sheetCam)}
             />
           )}</AnimatePresence>
@@ -400,7 +397,7 @@ export default function App() {
               </div>
 
               {tab === 'cameras' && (routeCams.length ? (
-                <CameraList cams={routeCams} route={route} roads={camRoads} active={active} setActive={setActive} scrollTo={scrollTo} onTimelapse={setLapse} onZoom={setZoom} />
+                <CameraList cams={routeCams} route={route} roads={camRoads} active={active} setActive={setActive} scrollTo={scrollTo} onZoom={setZoom} />
               ) : (
                 <div className="quiet"><Icon name="camera" size={20} /><p>{routeCamsAll.length ? 'Camera layers are switched off. Turn them back on in Layers on the map.' : `No cameras within ${CAM_RADIUS} m of this route.`}</p></div>
               ))}
@@ -412,7 +409,6 @@ export default function App() {
         </aside>
       </main>
 
-      <Timelapse cam={lapse} onClose={() => setLapse(null)} />
       <ZoomView cam={zoom} onClose={() => setZoom(null)} />
       <CityPicker open={cityOpen} first={cityKey == null} current={cityKey} onPick={pickCity}
         onClose={() => { setCityOpen(false); if (cityKey == null) setCityKey('calgary') }} />

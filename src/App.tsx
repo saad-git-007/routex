@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchCameras, fetchCommunities, setSearchNear, fetchEvents, fetchRoads, fetchWeather, planRoute } from './lib/api'
 import { LEVEL_TEXT, roadAt, roadGrade, routeLevel } from './lib/conditions'
 import { useFrames, useWatch } from './lib/frames'
-import { km, kmIn, mins, onRoute, overlaps, pointAt } from './lib/geo'
+import { km, kmIn, mins, onRoute, overlaps, pointAt, track } from './lib/geo'
 import { DEFAULT_LAYERS, layerLabel, sourceLabel, type LayerKey } from './lib/layers'
 import { ripple } from './lib/ripple'
 import { useLiveLocation } from './lib/useLocation'
@@ -16,6 +16,7 @@ import { AlertsPanel } from './components/AlertsPanel'
 import { AreaShow } from './components/AreaShow'
 import { QUADRANTS, type Area } from './lib/areas'
 import { LevelDetails } from './components/LevelDetails'
+import { LiveTrip, ON_ROUTE_M } from './components/LiveTrip'
 import { BeforeILeave } from './components/BeforeILeave'
 import { NO_REPORT, STALE_MS } from './components/CameraCard'
 import { CamSheet } from './components/CamSheet'
@@ -218,6 +219,19 @@ export default function App() {
     else setSheet(id)
   }, [routeCams, full, setTab])
 
+  // Live trip: where the live location is along the planned route (kept moving forward, see track()).
+  const lastAlong = useRef<{ route: Route | null; along: number | null }>({ route: null, along: null })
+  const live = useMemo(() => {
+    if (!route || !fix) { lastAlong.current = { route: null, along: null }; return null }
+    if (lastAlong.current.route !== route) lastAlong.current = { route, along: null }
+    const t = track(route, fix.lat, fix.lon, lastAlong.current.along)
+    if (t.off <= ON_ROUTE_M) lastAlong.current.along = t.along
+    return t
+  }, [route, fix])
+  const [follow, setFollow] = useState(true)
+  useEffect(() => { if (locOn) setFollow(true) }, [locOn])
+  const liveOn = !!(live && route && locOn)
+
   // Full screen: the real thing where the browser allows it, a fixed overlay everywhere (iPhone Safari can't full-screen a div).
   // Live location: centre on the first fix after switching on; a blocked permission switches it back off.
   const centred = useRef(false)
@@ -334,6 +348,7 @@ export default function App() {
             home={home} start={city ? { lat: city.lat, lon: city.lon, zoom: cityZoom(city) } : null} activeCam={active} focusAlong={focusAlong}
             onCam={onCam} onEvent={onEvent}
             onAddStop={(p) => setStops((s) => [...s, p])} onSetHome={setHome} flyTo={flyTo}
+            driven={liveOn && live!.off <= ON_ROUTE_M ? live!.along : null} follow={liveOn && follow} onUnfollow={() => setFollow(false)}
             controls={<>
               <button className={`map-btn loc-btn ${locOn && !fix ? 'is-seeking' : ''}`} onClick={() => { setLocMsg(''); setLocOn(!locOn) }} aria-pressed={locOn}
                 aria-label={locOn ? 'Hide my location' : 'Show my location'} title={locOn ? (fix ? `Hide my location (±${Math.round(fix.acc)} m)` : 'Finding you…') : 'Show my location'}>
@@ -352,6 +367,10 @@ export default function App() {
             )}
             {locMsg && !fix && <span className="loc-msg" role="status">{locMsg}</span>}
           </div>
+          {liveOn && !sheetCam && (
+            <LiveTrip route={route!} pos={live!} cams={routeCams} follow={follow} onFollow={() => setFollow(!follow)}
+              onCam={(id) => { setActive(id); setSheet(id) }} />
+          )}
           {a2hs && full && (
             <div className="a2hs" role="dialog" aria-labelledby="a2hs-h">
               <button className="btn-icon btn-xs a2hs-x" onClick={closeA2hs} aria-label="Close"><Icon name="x" size={16} /></button>

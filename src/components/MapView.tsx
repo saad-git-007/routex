@@ -40,6 +40,8 @@ type Props = {
   onCam: (id: string) => void; onEvent: (id: string) => void
   onAddStop: (p: Place) => void; onSetHome: (p: Place) => void
   flyTo: { lat: number; lon: number; zoom?: number; n: number } | null
+  /** Live trip: how far along the route the live location is (the part behind it is drawn as driven), and whether the map follows it. */
+  driven?: number | null; follow?: boolean; onUnfollow?: () => void
   /** Buttons stacked in the same column as the zoom buttons, above them. */
   controls?: ReactNode
 }
@@ -85,6 +87,7 @@ export function MapView(p: Props) {
     m.attributionControl.setPrefix(false)
     m.createPane('labels').style.zIndex = '405'
     m.createPane('route').style.zIndex = '410'
+    m.createPane('driven').style.zIndex = '411'
     m.createPane('cams').style.zIndex = '420'
     // Community names thin out as you zoom out, so the city view stays readable.
     const zoomClass = () => { const z = m.getZoom(); el.current!.dataset.z = z >= 13 ? 'near' : z >= 11.5 ? 'mid' : z >= 10.5 ? 'far' : 'out' }
@@ -92,7 +95,9 @@ export function MapView(p: Props) {
     // Tell the app what's on screen (it loads road conditions for the visible map outside Alberta).
     const view = () => { const b = m.getBounds(); cb.current.onView?.({ w: b.getWest(), s: b.getSouth(), e: b.getEast(), n: b.getNorth(), zoom: m.getZoom() }) }
     m.on('moveend', view); setTimeout(view)
-    for (const k of ['communities', 'allRoads', 'all', 'roads', 'route', 'progress', 'events', 'places', 'routeCams']) layers.current[k] = L.layerGroup().addTo(m)
+    // Dragging the map stops it following the live location.
+    m.on('dragstart', () => cb.current.follow && cb.current.onUnfollow?.())
+    for (const k of ['communities', 'allRoads', 'all', 'roads', 'route', 'driven', 'progress', 'events', 'places', 'routeCams']) layers.current[k] = L.layerGroup().addTo(m)
 
     m.on('click', async (e) => {
       const { lat, lng } = e.latlng
@@ -266,6 +271,16 @@ export function MapView(p: Props) {
     }
   }, [p.route, p.focusAlong])
 
+  // ── live trip: the part of the route already driven, greyed out ──
+  const drivenLine = useRef<L.Polyline | null>(null)
+  useEffect(() => {
+    const g = layers.current.driven
+    if (!p.route || p.driven == null || p.driven < 20) { g.clearLayers(); drivenLine.current = null; return }
+    const pts = sliceTo(p.route, p.driven)
+    if (!drivenLine.current) drivenLine.current = L.polyline(pts, { pane: 'driven', color: '#5b6577', weight: 7, opacity: 0.95, lineCap: 'round', interactive: false }).addTo(g)
+    else drivenLine.current.setLatLngs(pts)
+  }, [p.route, p.driven])
+
   // ── live location: dot, accuracy circle, and a heading cone while moving ──
   useEffect(() => {
     const m = map.current!
@@ -279,12 +294,18 @@ export function MapView(p: Props) {
     }
     me.current.acc.setLatLng(at).setRadius(p.me.acc)
     me.current.dot.setLatLng(at)
+    if (p.follow) m.panTo(at, { animate: true, duration: 0.6 })
     const node = me.current.dot.getElement()
     if (node) {
       node.classList.toggle('is-moving', moving)
       node.style.setProperty('--heading', `${moving ? p.me.heading : 0}deg`)
     }
-  }, [p.me])
+  }, [p.me]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Starting to follow: bring the map to the live location, close enough to see the street.
+  useEffect(() => {
+    if (p.follow && p.me && map.current) map.current.setView([p.me.lat, p.me.lon], Math.max(map.current.getZoom(), 15), { animate: true })
+  }, [p.follow]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (p.flyTo && map.current) map.current.flyTo([p.flyTo.lat, p.flyTo.lon], p.flyTo.zoom ?? Math.max(map.current.getZoom(), 15), { duration: 0.8 })

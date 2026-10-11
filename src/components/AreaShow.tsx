@@ -160,7 +160,7 @@ export function AreaShow({ open, onClose, cameras, roads: abRoads, prov, cityKey
               <div className="pick-address">
                 <AddressSearch placeholder="Go to an address" onPick={(p) => { setPin({ lat: p.lat, lon: p.lon, label: p.label }); setPickView({ center: [p.lat, p.lon], zoom: 15, n: Date.now() }) }} />
               </div>
-              <p className="pick-hint">Tap cameras on the map to add them. Tap again to take one off.</p>
+              <p className="pick-hint"><i className="pick-dot" aria-hidden /><span><b>The white dots on the map are cameras you can add.</b> Tap one to add it (it becomes a numbered blue circle); tap it again to take it off. Purple and orange dots are cameras too.</span></p>
             </div>
             <ol className="pick-list" aria-label="Cameras in this list">
               {edit.ids.map((id, j) => {

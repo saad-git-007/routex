@@ -115,3 +115,30 @@ export function offLine(lat: number, lon: number, line: [number, number][]) {
   }
   return best
 }
+
+/**
+ * Where a live position is along the route, for following a trip as it's driven. Searches just behind and ahead of
+ * the last known spot first, so a round trip's drive home (which may use the same roads) isn't mistaken for the
+ * drive out; if that finds nothing near, it looks along the whole route again.
+ */
+export function track(route: Route, lat: number, lon: number, prev: number | null): { along: number; off: number } {
+  if (prev == null) return project(route, lat, lon, 150)
+  const { coords, cum } = route
+  const cosLat = Math.cos(lat * K)
+  const lo = prev - 300, hi = prev + 6000
+  let best = { off: Infinity, along: prev }
+  for (let i = 1; i < coords.length; i++) {
+    if (cum[i] < lo) continue
+    if (cum[i - 1] > hi) break
+    const [aLat, aLon] = coords[i - 1], [bLat, bLon] = coords[i]
+    const ax = (aLon - lon) * K * cosLat * R, ay = (aLat - lat) * K * R
+    const bx = (bLon - lon) * K * cosLat * R, by = (bLat - lat) * K * R
+    const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy
+    const t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0
+    const off = Math.hypot(ax + t * dx, ay + t * dy)
+    if (off < best.off) best = { off, along: cum[i - 1] + t * (cum[i] - cum[i - 1]) }
+  }
+  if (best.off <= 150) return best
+  const again = project(route, lat, lon, 150)
+  return again.off < best.off ? again : best
+}

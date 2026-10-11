@@ -216,7 +216,7 @@ export function AreaShow({ open, onClose, cameras, roads: abRoads, prov, cityKey
                     <span>{l.name}</span><span className="lchip-n tnum">{l.ids.length}</span>
                   </button>
                 ))}
-                <button className="lchip lchip-add has-rpl" onClick={() => startEdit()}><Icon name="plus" size={14} /><span>{shownLists.length ? 'New list' : 'Make your own list'}</span></button>
+                <button className="lchip lchip-add has-rpl" onClick={() => startEdit()}><Icon name="plus" size={14} /><span>{shownLists.length ? 'New list' : 'Make your own list of traffic cameras'}</span></button>
               </div>
               {list ? (
                 <div className="list-tools">

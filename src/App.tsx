@@ -395,7 +395,7 @@ export default function App() {
 
       <Timelapse cam={lapse} onClose={() => setLapse(null)} />
       <ZoomView cam={zoom} onClose={() => setZoom(null)} />
-      <CityPicker open={cityOpen} first={cityKey == null} cameras={cameras} prov={prov} current={cityKey} onPick={pickCity}
+      <CityPicker open={cityOpen} first={cityKey == null} current={cityKey} onPick={pickCity}
         onClose={() => { setCityOpen(false); if (cityKey == null) setCityKey('calgary') }} />
       <AreaShow open={areasOpen} onClose={() => setAreasOpen(false)} cameras={cameras} roads={roads} cityKey={cityKey} area={area} setArea={setArea}
         lists={camLists} setLists={setCamLists} listId={listId} setListId={setListId} onZoom={setZoom} />

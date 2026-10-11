@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useFrame } from '../lib/frames'
-import { banffUrl, isBanff, isLive } from '../lib/live'
+import { directUrl, isStill, isLive } from '../lib/live'
 import { LiveVideo } from './LiveVideo'
 import type { Camera } from '../lib/types'
 import { Freshness } from './CameraCard'
@@ -104,7 +104,7 @@ export function ZoomView({ cam, onClose }: { cam: Camera | null; onClose: () => 
           <div ref={stage} className="zv-stage" data-zoomed="false" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
             onDoubleClick={(e) => { const [x, y] = local(e); zoomAt(t.current.s > 1.2 ? 1 : 2.5, x, y, true) }}>
             {isLive(cam.id) ? <LiveVideo id={cam.id} alt={`Live video from ${cam.name}`} className="zoom-live" videoRef={(el) => { img.current = el }} />
-              : (isBanff(cam.id) || f?.url) ? <img ref={(el) => { img.current = el }} src={isBanff(cam.id) ? banffUrl(cam.id, Math.floor(Date.now() / 60e3)) : f!.url} alt={`Latest picture from ${cam.name}`} draggable={false} /> : <div className="shot-loading" />}
+              : (isStill(cam.id) || f?.url) ? <img ref={(el) => { img.current = el }} src={isStill(cam.id) ? directUrl(cam.id, Math.floor(Date.now() / 60e3)) : f!.url} alt={`Latest picture from ${cam.name}`} draggable={false} /> : <div className="shot-loading" />}
           </div>
           <p className="zv-hint">Pinch, scroll or double-tap to zoom · drag to look around</p>
         </>

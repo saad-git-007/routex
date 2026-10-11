@@ -1,5 +1,5 @@
 import { ab511, cached, getJSON, inBox, UA, type Env } from '../../shared/edge'
-import { ontarioCameras } from '../../shared/ontario'
+import { isProv, provinceCameras } from '../../shared/canada'
 
 // Every camera the app knows: City of Calgary cameras, every Alberta 511 camera in the province, the Town of Banff's
 // street cameras and the City of Edmonton's live video cameras.
@@ -72,10 +72,8 @@ async function abCameras(env: Env): Promise<AbCam[]> {
 
 export const onRequestGet: PagesFunction<Env> = (ctx) =>
   cached(ctx, 3600, async () => {
-    if (new URL(ctx.request.url).searchParams.get('prov') === 'on') {
-      const on = await ontarioCameras()
-      return { updated: new Date().toISOString(), ...on }
-    }
+    const prov = new URL(ctx.request.url).searchParams.get('prov')
+    if (isProv(prov)) return { updated: new Date().toISOString(), ...(await provinceCameras(prov)) }
     const city = await getJSON<CityCam[]>('https://data.calgary.ca/resource/k7p9-kppz.json?$limit=2000', 3600)
     const cams: Camera[] = []
     for (const c of city) {

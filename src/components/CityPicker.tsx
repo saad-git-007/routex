@@ -1,68 +1,102 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { fetchCameras } from '../lib/api'
-import { PROVINCES, citiesWithCameras, type City, type Province } from '../lib/cities'
-import type { Camera } from '../lib/types'
+import { CITIES, regionName, type City } from '../lib/cities'
 import { Icon } from './Icon'
-import { Segmented } from './Segmented'
 
-// First visit (or the header's city button): which city to look at. A searchable list and a plain drop-down,
-// both of only the Alberta places that have cameras.
-export function CityPicker({ open, first, cameras, prov, current, onPick, onClose }: {
-  open: boolean; first: boolean; cameras: Camera[]; prov: Province; current: string | null; onPick: (c: City) => void; onClose: () => void
+type Row = City & { cams: number }
+const km = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) =>
+  Math.hypot((a.lat - b.lat) * 111.2, (a.lon - b.lon) * 111.2 * Math.cos((a.lat * Math.PI) / 180))
+
+// Loaded once per visit: how many cameras each city has (one small, edge-cached call).
+let counts: Promise<{ cities: { key: string; cams: number }[]; total: number }> | null = null
+const loadCounts = () => (counts ??= fetch('/api/cities').then((r) => r.json() as Promise<{ cities: { key: string; cams: number }[]; total: number }>).catch((e) => { counts = null; throw e }))
+
+// The welcome (and the header's city button): what RouteX does, then one search across every Canadian city with cameras.
+export function CityPicker({ open, first, current, onPick, onClose }: {
+  open: boolean; first: boolean; current: string | null; onPick: (c: City) => void; onClose: () => void
 }) {
-  // The province shown here can differ from the one loaded in the app; its cameras are fetched just for the counts.
-  const [p, setP] = useState<Province>(prov)
-  const [other, setOther] = useState<Partial<Record<Province, Camera[]>>>({})
-  useEffect(() => {
-    if (open && p !== prov && !other[p]) fetchCameras(p).then((c) => setOther((o) => ({ ...o, [p]: c }))).catch(() => {})
-  }, [open, p, prov]) // eslint-disable-line react-hooks/exhaustive-deps
-  const pool = p === prov ? cameras : other[p] ?? []
   const dlg = useRef<HTMLDialogElement>(null)
   const [q, setQ] = useState('')
-  const [sel, setSel] = useState<string>(current ?? '')
-  const cities = useMemo(() => citiesWithCameras(pool), [pool])
-  const shown = cities.filter((c) => c.name.toLowerCase().includes(q.trim().toLowerCase()))
-  const chosen = cities.find((c) => c.key === sel)
+  const [rows, setRows] = useState<Row[] | null>(null)
+  const [total, setTotal] = useState(0)
+  const [locating, setLocating] = useState(false)
+  const [note, setNote] = useState('')
 
   useEffect(() => {
-    if (open) { setQ(''); setSel(current ?? ''); setP(prov); dlg.current?.showModal() } else dlg.current?.close()
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!open) { dlg.current?.close(); return }
+    setQ(''); setNote(''); dlg.current?.showModal()
+    loadCounts().then((j) => {
+      const n = new Map(j.cities.map((c) => [c.key, c.cams]))
+      setRows(CITIES.filter((c) => n.has(c.key)).map((c) => ({ ...c, cams: n.get(c.key)! })))
+      setTotal(j.total)
+    }).catch(() => setRows([]))
+  }, [open])
+
+  const shown = useMemo(() => {
+    if (!rows) return []
+    const t = q.trim().toLowerCase()
+    if (!t) return [...rows].sort((a, b) => b.cams - a.cams).slice(0, 8)
+    const starts = rows.filter((c) => c.name.toLowerCase().startsWith(t))
+    const has = rows.filter((c) => !starts.includes(c) && c.name.toLowerCase().includes(t))
+    return [...starts, ...has].slice(0, 12)
+  }, [rows, q])
+
+  const nearMe = () => {
+    if (!rows?.length || !('geolocation' in navigator)) return
+    setLocating(true); setNote('')
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setLocating(false)
+        const me = { lat: p.coords.latitude, lon: p.coords.longitude }
+        const best = [...rows].sort((a, b) => km(me, a) - km(me, b))[0]
+        if (best && km(me, best) < 150) onPick(best)
+        else setNote('No cameras within 150 km of you yet. Search for a city instead.')
+      },
+      () => { setLocating(false); setNote("Couldn't get your location. Search for a city instead.") },
+      { timeout: 10000, maximumAge: 600000 },
+    )
+  }
 
   return (
     <dialog ref={dlg} className="city-dlg" onClose={onClose} aria-labelledby="city-q">
       {open && (
-        <form method="dialog" className="city-card" onSubmit={(e) => { e.preventDefault(); if (chosen) onPick(chosen) }}>
-          {first && <p className="eyebrow">Welcome to RouteX</p>}
+        <div className="city-card">
+          {!first && <button type="button" className="btn-icon btn-xs city-close" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" size={16} /></button>}
+          {first && (
+            <div className="city-intro">
+              <p className="eyebrow">Welcome to RouteX</p>
+              <p className="city-lede">See the road before you drive it. Live traffic cameras across Canada, with incidents, closures and road conditions.</p>
+              <ul className="city-feats">
+                <li><Icon name="route" size={16} /><span>Plan a trip and see every camera on the way, in driving order.</span></li>
+                <li><Icon name="camera" size={16} /><span>Look around your city in Areas, or save your own camera lists.</span></li>
+                <li><Icon name="alert" size={16} /><span>Check incidents, closures, weather and road conditions before you leave.</span></li>
+              </ul>
+            </div>
+          )}
           <h2 id="city-q">What city would you like to view?</h2>
-          <Segmented label="Province" className="city-prov" value={p} onChange={(v) => { setP(v); setSel(''); setQ('') }} options={PROVINCES.map((x) => ({ value: x.key, label: x.short }))} />
           <label className="city-search">
             <Icon name="search" size={16} />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${p === 'ab' ? 'Alberta' : 'GTA'} cities and towns`} aria-label="Search cities" autoFocus
-              onKeyDown={(e) => { if (e.key === 'Enter' && shown.length === 1) { e.preventDefault(); onPick(shown[0]) } }} />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search any city in Canada" aria-label="Search cities" autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter' && shown[0]) { e.preventDefault(); onPick(shown[0]) } }} />
           </label>
-          <ul className="city-list" role="listbox" aria-label="Cities with cameras">
-            {!pool.length && <li className="city-empty">Loading cameras…</li>}
-            {pool.length > 0 && !shown.length && <li className="city-empty">No cameras near “{q}”.</li>}
+          <ul className="city-list" aria-label={q ? 'Matching cities' : 'Cities with the most cameras'}>
+            {!rows && <li className="city-empty">Loading cameras…</li>}
+            {rows && !q && <li className="city-hint">Most cameras</li>}
+            {rows && q && !shown.length && <li className="city-empty">No cameras near “{q}” yet.</li>}
             {shown.map((c) => (
               <li key={c.key}>
-                <button type="button" role="option" aria-selected={c.key === sel} onClick={() => setSel(c.key)} onDoubleClick={() => onPick(c)}>
-                  <span>{c.name}</span><span className="city-n tnum">{c.cams} {c.cams === 1 ? 'camera' : 'cameras'}</span>
+                <button type="button" aria-current={c.key === current} onClick={() => onPick(c)}>
+                  <span className="city-name">{c.name}<small>{regionName(c)}</small></span>
+                  <span className="city-n tnum">{c.cams} {c.cams === 1 ? 'camera' : 'cameras'}</span>
                 </button>
               </li>
             ))}
           </ul>
-          <label className="city-select">
-            <span>Or choose from the list</span>
-            <select value={sel} onChange={(e) => setSel(e.target.value)} disabled={!cities.length}>
-              <option value="" disabled>Select a city…</option>
-              {cities.map((c) => <option key={c.key} value={c.key}>{c.name} ({c.cams})</option>)}
-            </select>
-          </label>
-          <div className="city-actions">
-            {!first && <button type="button" className="btn-ghost" onClick={() => dlg.current?.close()}>Cancel</button>}
-            <button type="submit" className="btn-accent" disabled={!chosen}>{chosen ? `View ${chosen.name}` : 'Pick a city'}<Icon name="chevron" size={16} /></button>
+          <div className="city-foot">
+            <button type="button" className="btn-ghost btn-sm" onClick={nearMe} disabled={!rows?.length || locating}><Icon name="locate" size={15} /> {locating ? 'Finding you…' : 'Use my location'}</button>
+            {total > 0 && <span className="tnum">{total.toLocaleString()} live cameras</span>}
           </div>
-        </form>
+          {note && <p className="city-note" role="status">{note}</p>}
+        </div>
       )}
     </dialog>
   )

@@ -20,7 +20,12 @@ const GEO = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer
 // Anywhere in the chosen province, ranked nearest to home (or the chosen city) first.
 const EXTENTS: Record<Province, object> = {
   ab: { xmin: -120.1, ymin: 48.95, xmax: -109.9, ymax: 60.05 },
-  on: { xmin: -80.6, ymin: 42.8, xmax: -78.2, ymax: 44.6 },
+  bc: { xmin: -139.1, ymin: 48.2, xmax: -114.0, ymax: 60.1 },
+  sk: { xmin: -110.1, ymin: 48.9, xmax: -101.3, ymax: 60.1 },
+  mb: { xmin: -102.1, ymin: 48.9, xmax: -88.9, ymax: 60.1 },
+  on: { xmin: -95.2, ymin: 41.6, xmax: -74.3, ymax: 56.9 },
+  atl: { xmin: -69.1, ymin: 43.3, xmax: -52.5, ymax: 60.4 },
+  yt: { xmin: -141.1, ymin: 60.0, xmax: -123.8, ymax: 69.7 },
 }
 let near = '-114.07,51.045', extent: Province = 'ab'
 export const setSearchNear = (lat: number, lon: number, prov: Province = 'ab') => { near = `${lon.toFixed(4)},${lat.toFixed(4)}`; extent = prov }

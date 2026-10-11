@@ -5,7 +5,7 @@ import { ago, kmIn } from '../lib/geo'
 import type { Camera, OnRoute, RoadCondition } from '../lib/types'
 import { useNow } from '../lib/useNow'
 import { Icon } from './Icon'
-import { banffUrl, isBanff, isDirect, isLive } from '../lib/live'
+import { directUrl, isStill, isDirect, isLive } from '../lib/live'
 import { LiveVideo } from './LiveVideo'
 
 export const STALE_MS = 15 * 60e3
@@ -16,16 +16,16 @@ export const NO_REPORT = { text: 'City street · no 511 road report' }
 /** Cross-fades to each new picture so a refresh never flashes empty. */
 export function Shot({ id, alt, className }: { id: string; alt: string; className?: string }) {
   if (isLive(id)) return <LiveVideo id={id} alt={alt} className={className} />
-  if (isBanff(id)) return <BanffStill id={id} alt={alt} className={className} />
+  if (isStill(id)) return <DirectStill id={id} alt={alt} className={className} />
   return <Still id={id} alt={alt} className={className} />
 }
 
-// Banff pictures load straight from the town's server, a fresh copy each minute, cross-fading like the others.
-function BanffStill({ id, alt, className }: { id: string; alt: string; className?: string }) {
+// Banff and Saskatchewan pictures load straight from their source, a fresh copy each minute, cross-fading like the others.
+function DirectStill({ id, alt, className }: { id: string; alt: string; className?: string }) {
   const minute = Math.floor(useNow(60e3) / 60e3)
   const [shown, setShown] = useState<string[]>([])
   const [error, setError] = useState(false)
-  const next = banffUrl(id, minute)
+  const next = directUrl(id, minute)
   return (
     <div className={`shot ${className ?? ''}`}>
       {!shown.length && (error ? <div className="shot-empty"><Icon name="camera" size={22} /><span>No picture</span></div> : <div className="shot-loading" />)}
@@ -61,7 +61,7 @@ function Still({ id, alt, className }: { id: string; alt: string; className?: st
 
 export function Freshness({ id }: { id: string }) {
   if (isLive(id)) return <span className="fresh fresh-live"><i />Live video</span>
-  if (isBanff(id)) return <span className="fresh fresh-live"><i />Updates every minute</span>
+  if (isStill(id)) return <span className="fresh fresh-live"><i />Refreshes every minute</span>
   return <Age id={id} />
 }
 

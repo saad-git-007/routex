@@ -802,3 +802,28 @@ html.is-map-full, html.is-map-full body { overflow: hidden; }
 .area-city svg { position: absolute; left: 12px; pointer-events: none; }
 .area-city select { width: 100%; min-height: 40px; padding: 0 12px 0 34px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-1); color: var(--text); font: inherit; font-size: .9rem; font-weight: 550; }
 .area-city select:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+/* ── Welcome: what RouteX does, then one Canada-wide city search ── */
+.city-card { position: relative; }
+.city-close { position: absolute; top: 14px; right: 14px; }
+.city-intro { display: grid; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--line-subtle); }
+.city-intro .eyebrow { margin: 0; }
+.city-lede { font: 400 1.05rem/1.45 var(--font-sans); color: var(--text); }
+.city-feats { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.city-feats li { display: flex; gap: 10px; align-items: flex-start; font-size: .84rem; line-height: 1.4; color: var(--text-2); }
+.city-feats svg { flex: none; margin-top: 1px; color: var(--accent); }
+.city-name { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+.city-name small { font-size: .72rem; font-weight: 500; color: var(--text-muted); }
+.city-list button { min-height: 48px; }
+.city-list button[aria-current=true] { background: var(--accent-soft); color: var(--text); }
+.city-hint { padding: 8px 12px 2px; font: 600 .68rem/1 var(--font-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+.city-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: .78rem; color: var(--text-muted); }
+.city-foot .btn-sm { gap: 6px; }
+.city-note { font-size: .8rem; color: var(--warn, #f5c542); }
+@media (max-width: 420px) { .city-lede { font-size: .95rem; } .city-feats li { font-size: .8rem; } .city-list { max-height: 30dvh; } }
+.city-dlg { width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); }
+.city-card { overflow-y: auto; gap: 12px; }
+.city-card h2 { font-size: 1.6rem; }
+.city-list { flex: none; min-height: 0; height: 248px; max-height: none; }
+.city-list .city-hint { font-size: .66rem; }
+@media (max-width: 420px) { .city-card h2 { font-size: 1.35rem; } .city-list { height: 210px; } }

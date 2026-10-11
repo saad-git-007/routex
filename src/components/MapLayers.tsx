@@ -6,10 +6,11 @@ import { RoadLegend } from './AlertsPanel'
 import { Icon } from './Icon'
 import type { Basemap } from './MapView'
 import { Segmented } from './Segmented'
+import type { Province } from '../lib/cities'
 
 // The map legend doubles as the filter: each swatch is a switch for that layer.
 export function MapLayers({ vis, setVis, counts, hasTrip, grades, prov, basemap, setBasemap, names, setNames, namesCount }: {
-  vis: Record<LayerKey, boolean>; setVis: (k: LayerKey, on: boolean) => void; counts: Partial<Record<LayerKey, number>>; hasTrip: boolean; grades: string[]; prov: 'ab' | 'on'
+  vis: Record<LayerKey, boolean>; setVis: (k: LayerKey, on: boolean) => void; counts: Partial<Record<LayerKey, number>>; hasTrip: boolean; grades: string[]; prov: Province
   basemap: Basemap; setBasemap: (b: Basemap) => void; names: boolean; setNames: (on: boolean) => void; namesCount?: number
 }) {
   const [open, setOpen] = useState(() => !matchMedia('(max-width: 900px)').matches)

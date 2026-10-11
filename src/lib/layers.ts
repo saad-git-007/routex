@@ -18,6 +18,8 @@ export const DEFAULT_LAYERS: Record<LayerKey, boolean> = { city: true, ab: true,
 /** Who runs a camera, from its id's first letter. */
 const SOURCES: Record<string, string> = {
   c: 'City of Calgary', a: '511 Alberta', e: 'City of Edmonton', b: 'Town of Banff',
-  t: 'City of Toronto', y: 'York Region', o: 'Ontario 511',
+  t: 'City of Toronto', y: 'York Region', o: 'Ontario 511', w: 'City of Ottawa',
+  d: 'DriveBC', r: 'City of Surrey', s: 'Saskatchewan Highway Hotline', m: 'Manitoba 511',
+  n: 'New Brunswick 511', v: 'Nova Scotia 511', p: 'PEI 511', l: 'Newfoundland and Labrador 511', k: 'Yukon 511',
 }
 export const sourceLabel = (c: { id: string }) => SOURCES[c.id[0]] ?? 'Traffic camera'

@@ -50,8 +50,8 @@ async function official(env: Env) {
 
 export const onRequestGet: PagesFunction<Env> = (ctx) =>
   cached(ctx, 600, async () => {
-    // Ontario 511's road conditions have no shapes without a developer key, so the GTA has none for now.
-    if (new URL(ctx.request.url).searchParams.get('prov') === 'on') return { updated: new Date().toISOString(), roads: [], stations: [] }
+    // Other provinces' 511 road conditions come without road shapes unless you have a developer key, so none for now.
+    if (new URL(ctx.request.url).searchParams.get('prov')) return { updated: new Date().toISOString(), roads: [], stations: [] }
     const data = await (ctx.env.AB511_KEY ? official(ctx.env) : scraped().then((roads) => ({ roads, stations: [] as Station[] }))).catch(() => null)
     return { updated: new Date().toISOString(), roads: data?.roads ?? [], stations: data?.stations ?? [], partial: !data?.roads.length }
   })

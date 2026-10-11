@@ -85,6 +85,12 @@ export function BeforeILeave({ open, onClose, route, cams, events, camRoads, wea
                 const [x, y] = mini.xy(c.lat, c.lon)
                 return <circle key={c.id} cx={x} cy={y} r={j === i ? 2.6 : 1.5} className={j === i ? 'on' : j < i ? 'past' : ''} onClick={() => { go(j) }} />
               })}
+              {/* Home and the stops (D1, D2…), drawn like the map's markers. */}
+              {(() => { const [x, y] = mini.xy(route.order[0].lat, route.order[0].lon); return <g className="mini-home"><circle cx={x} cy={y} r={4.5} /></g> })()}
+              {route.order.slice(1).filter((p) => p.id !== route.order[0].id).map((p, j) => {
+                const [x, y] = mini.xy(p.lat, p.lon)
+                return <g key={p.id} className="mini-stop"><circle cx={x} cy={y} r={5.5} /><text x={x} y={y}>D{j + 1}</text></g>
+              })}
             </svg>
             <ol className="bil-dots" aria-label="Cameras">
               {cams.map((c, j) => (

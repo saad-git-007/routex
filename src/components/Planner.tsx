@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { satThumb } from '../lib/api'
 import { km } from '../lib/geo'
-import type { OptimizeBy, Place, Route, TripShape } from '../lib/types'
+import type { Place, Route, TripShape } from '../lib/types'
 import { AddressSearch } from './AddressSearch'
 import { Icon } from './Icon'
 import { Segmented } from './Segmented'
@@ -20,7 +20,6 @@ type Props = {
 const near = (a: Place, b: Place) => Math.abs(a.lat - b.lat) < 1e-4 && Math.abs(a.lon - b.lon) < 1e-4
 
 const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-const cost = (by: OptimizeBy, v: number) => (by === 'distance' ? km(v) : `${Math.max(1, Math.round(v / 60))} min`)
 
 export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape, setShape, keepOrder, setKeepOrder, route, routing, error, onFocus }: Props) {
   const [editHome, setEditHome] = useState(false)
@@ -38,8 +37,8 @@ export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape
   const [done, setDone] = useState('')
   useEffect(() => {
     if (!opt || opt.kept || routing) return
-    const saves = opt.reordered && opt.entered - opt.best > 50 ? ` · saves ${cost(opt.by, opt.entered - opt.best)}` : ''
-    setDone(`Route optimized${saves}`)
+    const saved = opt.reordered ? opt.entered - opt.best : 0
+    setDone(saved > 50 ? `Route optimized: you save ${(saved / 1000).toFixed(1)} km with the shortest route` : 'Route optimized: your stops were already in the shortest order')
     const t = setTimeout(() => setDone(''), 3500)
     return () => clearTimeout(t)
   }, [opt, routing])

@@ -27,7 +27,6 @@ export const BANFF: { file: string; name: string; lat: number; lon: number }[] =
   { file: 'spray-west', name: 'Spray Ave, looking east towards the Banff Springs', lat: 51.1688, lon: -115.5652 },
   { file: 'Norquay_North', name: 'Mt Norquay Rd at the Fenlands, looking north', lat: 51.1852, lon: -115.5797 },
   { file: 'Norquay_South', name: 'Mt Norquay Rd at the Fenlands, looking south', lat: 51.1849, lon: -115.5795 },
-  { file: 'train-w', name: 'Train station parking, entrance', lat: 51.1823, lon: -115.5776 },
   { file: 'train-e', name: 'Train station parking, looking east', lat: 51.1821, lon: -115.5765 },
 ]
 

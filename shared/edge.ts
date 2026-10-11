@@ -16,7 +16,7 @@ export const json = (body: unknown, maxAge: number, extra: Record<string, string
 export async function cached(ctx: { request: Request; waitUntil(p: Promise<unknown>): void }, ttl: number, build: () => Promise<unknown>) {
   const cache = (caches as unknown as { default: Cache }).default
   const u = new URL(ctx.request.url)
-  u.searchParams.set('_v', '8') // bump when a response shape changes
+  u.searchParams.set('_v', '9') // bump when a response shape changes
   const key = new Request(u.toString(), { method: 'GET' })
   const hit = await cache.match(key)
   if (hit) return new Response(hit.body, { headers: { ...Object.fromEntries(hit.headers), 'x-edge': 'hit' } })

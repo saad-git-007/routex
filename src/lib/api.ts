@@ -10,7 +10,7 @@ async function get<T>(url: string, signal?: AbortSignal): Promise<T> {
 }
 // Alberta keeps its original addresses (so cached copies stay valid); other provinces add ?prov=.
 const q = (prov: Province, ab: string) => (prov === 'ab' ? ab : `prov=${prov}`)
-export const fetchCameras = (prov: Province = 'ab') => get<{ cameras: Camera[] }>(`/api/cameras?${q(prov, 'ab=all&town=2')}`).then((r) => r.cameras)
+export const fetchCameras = (prov: Province = 'ab') => get<{ cameras: Camera[] }>(`/api/cameras?${q(prov, 'ab=all&town=3')}`).then((r) => r.cameras)
 export const fetchEvents = (prov: Province = 'ab') => get<{ events: RoadEvent[]; alerts: Alert[]; updated: string }>(`/api/events?${q(prov, 'ab=all')}`)
 export const fetchCommunities = () => get<{ communities: Community[] }>('/api/communities').then((r) => r.communities)
 export const fetchRoads = (prov: Province = 'ab') => get<{ roads: RoadCondition[]; stations: Station[] }>(`/api/roads?${q(prov, 'ab=all')}`)

@@ -131,7 +131,7 @@ export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape
               })}
             </AnimatePresence>
             {shape === 'round' && list.length > 0 && (
-              <li className="stop-return"><div className="stop-row"><span className="node node-home node-ghost"><Icon name="home" size={13} /></span><span className="stop-main is-static"><span className="stop-label">Back home</span>{routeMatches && <span className="stop-meta tnum">{Math.round(route.legs[route.legs.length - 1].duration / 60)} min · {km(route.legs[route.legs.length - 1].distance)} · arrive {clock(arrive[arrive.length - 1])}</span>}</span></div></li>
+              <li className="stop-return"><div className="stop-row"><span className="node node-home node-return"><Icon name="home" size={14} /></span><span className="stop-main is-static"><span className="stop-label">Back home</span>{routeMatches && <span className="stop-meta tnum">{Math.round(route.legs[route.legs.length - 1].duration / 60)} min · {km(route.legs[route.legs.length - 1].distance)} · arrive {clock(arrive[arrive.length - 1])}</span>}</span></div></li>
             )}
           </ol>
 

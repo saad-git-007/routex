@@ -76,7 +76,7 @@ function BeforeILeaveView({ open, onClose, route, cams, events, camRoads, weathe
           <aside className="bil-rail">
             <div className="bil-head">
               <p className="eyebrow">Cameras on your route</p>
-              <h2><span className="tnum">{mins(route.duration)}</span> · <span className="tnum">{km(route.distance)}</span></h2>
+              <h2 className="bil-time"><span className="tnum">{mins(route.duration)}</span> · <span className="tnum">{km(route.distance)}</span></h2>
               <LevelDetails level={level} reasons={reasons} events={allEvents} alerts={alerts} showReasons />
               {weather.length > 0 && (
                 <p className="bil-wx"><Icon name={sky(weather[0].code).icon} size={16} /> {sky(weather[0].code).text} · <span className="tnum">{Math.round(Math.min(...temps))}°–{Math.round(Math.max(...temps))}°</span></p>

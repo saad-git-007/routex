@@ -3,6 +3,7 @@ import { useRef, useState } from 'react'
 import type { Camera, RoadCondition } from '../lib/types'
 import { Freshness, RoadNote, Shot } from './CameraCard'
 import { Icon } from './Icon'
+import { isDirect } from '../lib/live'
 
 // A swipe-up panel for one camera: the picture shows at once; drag up for a bigger view, down to close.
 // Drag thresholds after vaul (MIT, Emil Kowalski) and beUI bottom-sheet (MIT, Saurabh Chauhan).
@@ -44,7 +45,7 @@ export function CamSheet({ cam, index, total, meta, road, onPrev, onNext, onClos
           <b>{cam.name}</b>
           <span>{meta}</span>
         </div>
-        <button className="btn-icon btn-xs" onClick={onTimelapse} aria-label="Time-lapse" title="Time-lapse"><Icon name="film" size={16} /></button>
+        {!isDirect(cam.id) && <button className="btn-icon btn-xs" onClick={onTimelapse} aria-label="Time-lapse" title="Time-lapse"><Icon name="film" size={16} /></button>}
         <button className="btn-icon btn-xs" onClick={onClose} aria-label="Close"><Icon name="x" size={16} /></button>
       </div>
       <div className="camsheet-pic" role="button" tabIndex={0} aria-label="Zoom into the picture" title="Tap to zoom" onClick={onZoom} onKeyDown={(e) => e.key === 'Enter' && onZoom()}>

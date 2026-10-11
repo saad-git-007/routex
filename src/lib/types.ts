@@ -1,10 +1,11 @@
 export type Place = { id: string; label: string; lat: number; lon: number }
-export type Camera = { id: string; src: 'city' | 'ab'; name: string; area: string; lat: number; lon: number }
+export type Camera = { id: string; src: 'city' | 'ab' | 'town'; name: string; area: string; lat: number; lon: number }
 export type RoadEvent = {
   id: string; kind: 'incident' | 'closure' | 'construction'; src: 'city' | 'ab'
   title: string; detail: string; lat: number; lon: number; start?: string; end?: string; updated?: string
 }
 export type RoadCondition = { id: number; hwy: string; segment: string; condition: string; extra: string[]; visibility: string; updated: string; stale: boolean; line?: [number, number][] }
+export type Community = { name: string; kind: 'home' | 'industry' | 'park'; label: [number, number]; rings: [number, number][][] }
 export type Station = { id: number; lat: number; lon: number; air: number; pavement: number; wind: number; updated: number }
 export type Alert = { id: number; title: string; notes: string; end?: string; high: boolean }
 export type TripShape = 'round' | 'oneway'

@@ -1,6 +1,6 @@
 import { ab511, cached, decodePolyline, inBox, UA, type Env } from '../../shared/edge'
 
-// Alberta 511 winter road conditions around Calgary, plus road weather stations (pavement temperature).
+// Alberta 511 winter road conditions across the province, plus road weather stations (pavement temperature).
 // With the developer key each segment comes with its shape, so it can be matched to a route by location;
 // without it, segments are text only and matched by highway number.
 
@@ -10,7 +10,7 @@ type ApiStation = { Id: number; Latitude: number; Longitude: number; LastUpdated
 export type RoadCondition = { id: number; hwy: string; segment: string; condition: string; extra: string[]; visibility: string; updated: string; stale: boolean; line?: [number, number][] }
 export type Station = { id: number; lat: number; lon: number; air: number; pavement: number; wind: number; updated: number }
 
-const REGION = /CALGARY|STONEY|CMA 520|CMA 521|CMA 522 - (Nanton|Claresholm)|BANFF HOU/i
+const REGION = /./ // the whole province
 const fmt = (t: number) => new Date(t * 1000).toLocaleString('en-CA', { timeZone: 'America/Edmonton', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 
 async function page(start: number) {

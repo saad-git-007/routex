@@ -11,7 +11,7 @@ export function Segmented<T extends string>({ value, options, onChange, label, c
   useLayoutEffect(() => {
     const measure = () => {
       const el = ref.current?.querySelector<HTMLElement>('[aria-pressed="true"]')
-      if (el) setPill({ x: el.offsetLeft, w: el.offsetWidth })
+      setPill(el ? { x: el.offsetLeft, w: el.offsetWidth } : null)
     }
     measure()
     const ro = new ResizeObserver(measure)

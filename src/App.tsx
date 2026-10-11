@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fetchCameras, fetchEvents, fetchRoads, fetchWeather, planRoute } from './lib/api'
+import { fetchCameras, fetchCommunities, setSearchNear, fetchEvents, fetchRoads, fetchWeather, planRoute } from './lib/api'
 import { LEVEL_TEXT, roadAt, roadGrade, routeLevel } from './lib/conditions'
 import { useFrames, useWatch } from './lib/frames'
 import { km, kmIn, mins, onRoute, overlaps, pointAt } from './lib/geo'
-import { DEFAULT_LAYERS, type LayerKey } from './lib/layers'
+import { DEFAULT_LAYERS, sourceLabel, type LayerKey } from './lib/layers'
 import { ripple } from './lib/ripple'
+import { useLiveLocation } from './lib/useLocation'
+import type { CamList } from './lib/lists'
 import { useStored } from './lib/store'
 import { useBump } from './lib/useSeen'
 import { AnimatePresence } from 'motion/react'
-import type { Camera, OnRoute, OptimizeBy, Place, RoadEvent, Route, TripShape, Weather } from './lib/types'
+import type { Camera, Community, OnRoute, OptimizeBy, Place, RoadEvent, Route, TripShape, Weather } from './lib/types'
 import { AlertsPanel } from './components/AlertsPanel'
 import { AreaShow } from './components/AreaShow'
-import type { Area } from './lib/areas'
+import { areaOf, type Area } from './lib/areas'
 import { BeforeILeave } from './components/BeforeILeave'
 import { STALE_MS } from './components/CameraCard'
 import { CamSheet } from './components/CamSheet'
@@ -21,7 +23,9 @@ import { ZoomView } from './components/ZoomView'
 import { readTripLink, type SavedRoute } from './lib/trip'
 import { CameraList } from './components/CameraList'
 import { Icon } from './components/Icon'
-import { MapView } from './components/MapView'
+import { MapView, type Basemap } from './components/MapView'
+import { CityPicker } from './components/CityPicker'
+import { CITIES, cityZoom, type City } from './lib/cities'
 import { Planner } from './components/Planner'
 import { Segmented } from './components/Segmented'
 import { Timelapse } from './components/Timelapse'
@@ -51,15 +55,28 @@ const CAM_RADIUS = 250
 export default function App() {
   const [home, setHome] = useStored<Place | null>('home', null)
   const [stops, setStops] = useStored<Place[]>('stops', [])
+  if (home) setSearchNear(home.lat, home.lon)
   const [saved, setSaved] = useStored<Place[]>('saved', [])
   const [shape, setShape] = useStored<TripShape>('shape', 'round')
     const [tab, setTab] = useStored<Tab>('tab', 'cameras')
   const [area, setArea] = useStored<Area>('area', 'ne')
+  const [camLists, setCamLists] = useStored<CamList[]>('camLists', [])
+  const [listId, setListId] = useStored<string | null>('camList', null)
   // Stops are always ordered for the shortest total distance.
   const by: OptimizeBy = 'distance'
   const [layerPrefs, setLayerPrefs] = useStored<Partial<Record<LayerKey, boolean>>>('layers', {})
   const vis = { ...DEFAULT_LAYERS, ...layerPrefs }
   const setVis = (k: LayerKey, on: boolean) => setLayerPrefs((v) => ({ ...v, [k]: on }))
+  const [basemap, setBasemap] = useStored<Basemap>('basemap', 'sat')
+  const [names, setNames] = useStored('communities', false)
+  const [communities, setCommunities] = useState<Community[] | null>(null)
+  const [locOn, setLocOn] = useStored('liveLocation', false)
+  const { fix, error: locError } = useLiveLocation(locOn)
+  const [locMsg, setLocMsg] = useState('')
+  // Community boundaries are only fetched the first time the names are switched on.
+  useEffect(() => {
+    if (names && !communities) fetchCommunities().then(setCommunities).catch(() => setNames(false))
+  }, [names]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [cameras, setCameras] = useState<Camera[]>([])
   const [route, setRoute] = useState<Route | null>(null)
@@ -76,6 +93,19 @@ export default function App() {
   const [lapse, setLapse] = useState<Camera | null>(null)
   const [leaving, setLeaving] = useState(false)
   const [areasOpen, setAreasOpen] = useState(false)
+  // The city to look at. Unset means a first visit, which opens the city question.
+  const [cityKey, setCityKey] = useStored<string | null>('city', null)
+  const [cityOpen, setCityOpen] = useState(cityKey == null)
+  const city = CITIES.find((c) => c.key === cityKey)
+  if (!home && city) setSearchNear(city.lat, city.lon)
+  const pickCity = (c: City) => {
+    setCityKey(c.key); setCityOpen(false)
+    setFlyTo({ lat: c.lat, lon: c.lon, zoom: cityZoom(c), n: Date.now() })
+    // Areas follows: a region of Alberta, or keep the chosen part of Calgary.
+    const a = areaOf({ lat: c.lat, lon: c.lon, name: '', src: 'ab', area: '', id: '' })
+    if (c.key !== 'calgary') setArea(a)
+    else if (!['nw', 'ne', 'centre', 'sw', 'se'].includes(area)) setArea('ne')
+  }
   const [selEvent, setSelEvent] = useState<string | null>(null)
 
   useEffect(() => { fetchCameras().then(setCameras).catch(() => {}) }, [])
@@ -122,10 +152,10 @@ export default function App() {
   const routeEventsAll = useMemo(() => (route ? onRoute(route, events, CAM_RADIUS) : []), [route, events])
   const routeEventIds = useMemo(() => new Set(routeEventsAll.map((e) => e.id)), [routeEventsAll])
   // What's shown follows the layer switches.
-  const routeCams = useMemo(() => routeCamsAll.filter((c) => vis[c.src]), [routeCamsAll, vis.city, vis.ab]) // eslint-disable-line react-hooks/exhaustive-deps
+  const routeCams = useMemo(() => routeCamsAll.filter((c) => vis[c.src]), [routeCamsAll, vis.city, vis.ab, vis.town]) // eslint-disable-line react-hooks/exhaustive-deps
   const routeEvents = routeEventsAll.filter((e) => vis[e.kind])
   const mapEvents = useMemo(() => events.filter((e) => vis[e.kind]), [events, vis.incident, vis.closure, vis.construction]) // eslint-disable-line react-hooks/exhaustive-deps
-  const mapCameras = useMemo(() => (route && !vis.others ? [] : cameras.filter((c) => vis[c.src])), [cameras, route, vis.others, vis.city, vis.ab]) // eslint-disable-line react-hooks/exhaustive-deps
+  const mapCameras = useMemo(() => (route && !vis.others ? [] : cameras.filter((c) => vis[c.src])), [cameras, route, vis.others, vis.city, vis.ab, vis.town]) // eslint-disable-line react-hooks/exhaustive-deps
   // Keyed 511 data has each segment's shape: match by location. Otherwise fall back to the highway numbers the route uses.
   const routeRoads = useMemo(() => (route ? roads.filter((r) => (r.line?.length ? overlaps(route, r.line) : route.highways.some((h) => h.toUpperCase() === r.hwy.toUpperCase()))) : []), [route, roads])
   const routeStations = useMemo(() => {
@@ -169,6 +199,20 @@ export default function App() {
   }, [routeCams, full, setTab])
 
   // Full screen: the real thing where the browser allows it, a fixed overlay everywhere (iPhone Safari can't full-screen a div).
+  // Live location: centre on the first fix after switching on; a blocked permission switches it back off.
+  const centred = useRef(false)
+  useEffect(() => {
+    if (!locOn) { centred.current = false; return }
+    if (fix && !centred.current) { centred.current = true; setFlyTo({ lat: fix.lat, lon: fix.lon, zoom: 15, n: Date.now() }) }
+  }, [fix, locOn])
+  useEffect(() => {
+    if (!locError) return
+    setLocMsg(locError.text)
+    if (locError.code === 1) setLocOn(false)
+    const t = setTimeout(() => setLocMsg(''), 6000)
+    return () => clearTimeout(t)
+  }, [locError]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const toggleFull = () => {
     if (!full) { setFull(true); mapCol.current?.requestFullscreen?.().catch(() => {}) }
     else { setFull(false); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}) }
@@ -191,12 +235,12 @@ export default function App() {
   const stepSheet = (d: number) => { const c = routeCams[sheetIdx + d]; if (c) { setSheet(c.id); setActive(c.id) } }
   const layerCounts: Partial<Record<LayerKey, number>> = route
     ? {
-        city: routeCamsAll.filter((c) => c.src === 'city').length, ab: routeCamsAll.filter((c) => c.src === 'ab').length, others: cameras.length - routeCamsAll.length,
+        city: routeCamsAll.filter((c) => c.src === 'city').length, ab: routeCamsAll.filter((c) => c.src === 'ab').length, town: routeCamsAll.filter((c) => c.src === 'town').length, others: cameras.length - routeCamsAll.length,
         incident: routeEventsAll.filter((e) => e.kind === 'incident').length, closure: routeEventsAll.filter((e) => e.kind === 'closure').length,
         construction: routeEventsAll.filter((e) => e.kind === 'construction').length, roads: routeRoads.length, allRoads: roads.length,
       }
     : {
-        city: cameras.filter((c) => c.src === 'city').length, ab: cameras.filter((c) => c.src === 'ab').length,
+        city: cameras.filter((c) => c.src === 'city').length, ab: cameras.filter((c) => c.src === 'ab').length, town: cameras.filter((c) => c.src === 'town').length,
         incident: events.filter((e) => e.kind === 'incident').length, closure: events.filter((e) => e.kind === 'closure').length, construction: events.filter((e) => e.kind === 'construction').length, allRoads: roads.length,
       }
   const shownRoads = vis.roads ? routeRoads : []
@@ -228,6 +272,9 @@ export default function App() {
           </div>
         )}
         <div className="top-actions">
+          <button className="btn-city has-rpl" onPointerDown={ripple} onClick={() => setCityOpen(true)} aria-label={`City: ${city?.name ?? 'choose one'}. Change city`} title="Change city">
+            <Icon name="pin" size={16} /><span>{city?.name ?? 'City'}</span>
+          </button>
           <button className="btn-areas has-rpl" onPointerDown={ripple} onClick={() => setAreasOpen(true)} aria-label="Areas: five cameras spread across a part of the city" title="Areas">
             <Icon name="camera" size={16} /><span>Areas</span>
           </button>
@@ -241,15 +288,22 @@ export default function App() {
         <div className={`map-col ${full ? 'is-full' : ''}`} ref={mapCol}>
           <MapView
             cameras={mapCameras} routeCams={routeCams} route={route} events={mapEvents} routeEventIds={routeEventIds} routeRoads={shownRoads} allRoads={vis.allRoads ? roads : []}
-            home={home} activeCam={active} focusAlong={focusAlong}
+            basemap={basemap} communities={names ? communities ?? [] : []} me={fix}
+            home={home} start={city ? { lat: city.lat, lon: city.lon, zoom: cityZoom(city) } : null} activeCam={active} focusAlong={focusAlong}
             onCam={onCam} onEvent={onEvent}
             onAddStop={(p) => setStops((s) => [...s, p])} onSetHome={setHome} flyTo={flyTo}
           />
-          <MapLayers vis={vis} setVis={setVis} counts={layerCounts} hasTrip={hasTrip} grades={[...shownRoads, ...(vis.allRoads ? roads : [])].map(roadGrade)} />
+          <MapLayers vis={vis} setVis={setVis} counts={layerCounts} hasTrip={hasTrip} grades={[...shownRoads, ...(vis.allRoads ? roads : [])].map(roadGrade)}
+            basemap={basemap} setBasemap={setBasemap} names={names} setNames={setNames} namesCount={communities?.length} />
           <div className="map-tools">
             {full && hasTrip && (
               <span className="full-stats"><b className="tnum">{mins(route.duration)}</b> · <span className="tnum">{km(route.distance)}</span><span className={`level level-${level}`}><i />{LEVEL_TEXT[level]}</span></span>
             )}
+            {locMsg && !fix && <span className="loc-msg" role="status">{locMsg}</span>}
+            <button className={`map-btn loc-btn ${locOn && !fix ? 'is-seeking' : ''}`} onClick={() => { setLocMsg(''); setLocOn(!locOn) }} aria-pressed={locOn}
+              aria-label={locOn ? 'Hide my location' : 'Show my location'} title={locOn ? (fix ? `Hide my location (±${Math.round(fix.acc)} m)` : 'Finding you…') : 'Show my location'}>
+              <Icon name="locate" size={18} />
+            </button>
             <button className="map-btn" onClick={toggleFull} aria-pressed={full} aria-label={full ? 'Exit full screen' : 'Full-screen map'} title={full ? 'Exit full screen (Esc)' : 'Full-screen map'}>
               <Icon name={full ? 'unfull' : 'full'} size={18} />
             </button>
@@ -261,7 +315,7 @@ export default function App() {
               road={camRoads.get(sheetCam.id) ?? roadAt(sheetCam, roads)}
               index={sheetIdx >= 0 ? sheetIdx : null}
               total={routeCams.length}
-              meta={sheetIdx >= 0 ? `${kmIn(routeCams[sheetIdx].along)} on your route${sheetCam.src === 'ab' ? ' · 511' : ''}` : `${sheetCam.src === 'ab' ? '511 Alberta' : 'City of Calgary'} · not on your route`}
+              meta={sheetIdx >= 0 ? `${kmIn(routeCams[sheetIdx].along)} on your route${sheetCam.src === 'city' ? '' : ' · ' + sourceLabel(sheetCam)}` : `${sourceLabel(sheetCam)} · not on your route`}
               onPrev={sheetIdx > 0 ? () => stepSheet(-1) : undefined}
               onNext={sheetIdx >= 0 && sheetIdx < routeCams.length - 1 ? () => stepSheet(1) : undefined}
               onClose={() => setSheet(null)}
@@ -301,7 +355,7 @@ export default function App() {
                 <li><b>2</b>Add destinations</li>
                 <li><b>3</b>Scroll the cameras</li>
               </ol>
-              <p className="empty-foot mono"><NumberTicker value={cameras.length} /> cameras live across Calgary</p>
+              <p className="empty-foot mono"><NumberTicker value={cameras.length} /> cameras live across Alberta</p>
             </section>
           ) : (
             <>
@@ -340,7 +394,10 @@ export default function App() {
 
       <Timelapse cam={lapse} onClose={() => setLapse(null)} />
       <ZoomView cam={zoom} onClose={() => setZoom(null)} />
-      <AreaShow open={areasOpen} onClose={() => setAreasOpen(false)} cameras={cameras} roads={roads} area={area} setArea={setArea} onZoom={setZoom} />
+      <CityPicker open={cityOpen} first={cityKey == null} cameras={cameras} current={cityKey} onPick={pickCity}
+        onClose={() => { setCityOpen(false); if (cityKey == null) setCityKey('calgary') }} />
+      <AreaShow open={areasOpen} onClose={() => setAreasOpen(false)} cameras={cameras} roads={roads} area={area} setArea={setArea}
+        lists={camLists} setLists={setCamLists} listId={listId} setListId={setListId} onZoom={setZoom} />
       {route && <BeforeILeave open={leaving} onClose={() => setLeaving(false)} route={route} cams={routeCams} events={routeEvents as OnRoute<RoadEvent>[]} camRoads={camRoads} weather={weather} level={level} reasons={reasons} onZoom={setZoom} />}
     </div>
   )

@@ -3,16 +3,38 @@ import 'leaflet/dist/leaflet.css'
 import { useEffect, useRef } from 'react'
 import { reverse } from '../lib/api'
 import { sliceTo, pointAt } from '../lib/geo'
-import type { Camera, OnRoute, Place, RoadCondition, RoadEvent, Route } from '../lib/types'
+import type { Camera, Community, OnRoute, Place, RoadCondition, RoadEvent, Route } from '../lib/types'
 import { GRADE_COLOR, roadGrade } from '../lib/conditions'
+import type { Fix } from '../lib/useLocation'
 
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services'
 const CALGARY: L.LatLngTuple = [51.045, -114.07]
+export type Basemap = 'sat' | 'streets'
+
+// Each basemap: a coarse copy underneath (so loading tiles show blurred map, not a blank), the base, and overlays.
+function basemapLayers(b: Basemap) {
+  const common = { updateWhenZooming: false, keepBuffer: 4, maxZoom: 19 }
+  if (b === 'streets') {
+    const url = `${ESRI}/World_Street_Map/MapServer/tile/{z}/{y}/{x}`
+    return [
+      L.tileLayer(url, { maxNativeZoom: 10, keepBuffer: 8, zIndex: 0, className: 'tiles-under' }),
+      L.tileLayer(url, { ...common, zIndex: 1, className: 'tiles-streets', attribution: 'Map © Esri, HERE, Garmin, OpenStreetMap contributors' }),
+    ]
+  }
+  const url = `${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`
+  return [
+    L.tileLayer(url, { maxNativeZoom: 10, keepBuffer: 8, zIndex: 0, className: 'tiles-under' }),
+    L.tileLayer(url, { ...common, zIndex: 1, className: 'tiles-imagery', attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }),
+    L.tileLayer(`${ESRI}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`, { ...common, zIndex: 2, className: 'tiles-roads' }),
+    L.tileLayer(`${ESRI}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, { ...common, zIndex: 3 }),
+  ]
+}
 
 type Props = {
   cameras: Camera[]; routeCams: OnRoute<Camera>[]; route: Route | null; events: RoadEvent[]; routeEventIds: Set<string>; routeRoads: RoadCondition[]
   allRoads: RoadCondition[]
-  home: Place | null; activeCam: string | null; focusAlong: number | null
+  basemap: Basemap; communities: Community[]; me: Fix | null
+  home: Place | null; start: { lat: number; lon: number; zoom: number } | null; activeCam: string | null; focusAlong: number | null
   onCam: (id: string) => void; onEvent: (id: string) => void
   onAddStop: (p: Place) => void; onSetHome: (p: Place) => void
   flyTo: { lat: number; lon: number; zoom?: number; n: number } | null
@@ -26,23 +48,37 @@ export function MapView(p: Props) {
   const layers = useRef<Record<string, L.LayerGroup>>({})
   const camMarkers = useRef(new Map<string, L.Marker>())
   const progress = useRef<{ line: L.Polyline; glow: L.Polyline; car: L.Marker } | null>(null)
+  const me = useRef<{ dot: L.Marker; acc: L.Circle } | null>(null)
   const cb = useRef(p)
   cb.current = p
 
+  // Hide community names that would overlap a bigger community's name. Neighbourhoods come before
+  // industrial areas and parks, then shorter names first so more of them fit.
+  const declutter = () => {
+    const labels = [...(el.current?.querySelectorAll<HTMLElement>('.mk-comm') ?? [])]
+    labels.forEach((n) => n.classList.remove('is-hidden'))
+    const boxes = labels.map((n) => ({ n, r: n.firstElementChild!.getBoundingClientRect(), home: n.classList.contains('is-home') }))
+      .filter((b) => b.r.width > 0)
+      .sort((a, b) => Number(b.home) - Number(a.home) || a.r.width - b.r.width)
+    const kept: DOMRect[] = []
+    for (const b of boxes) {
+      const hit = kept.some((k) => b.r.left < k.right + 6 && b.r.right > k.left - 6 && b.r.top < k.bottom + 3 && b.r.bottom > k.top - 3)
+      if (hit) b.n.classList.add('is-hidden'); else kept.push(b.r)
+    }
+  }
+
   // ── init ──
   useEffect(() => {
-    const m = L.map(el.current!, { zoomControl: false, preferCanvas: true, attributionControl: true, zoomSnap: 0.25, minZoom: 8 }).setView(CALGARY, 11)
+    const m = L.map(el.current!, { zoomControl: false, preferCanvas: true, attributionControl: true, zoomSnap: 0.25, minZoom: 5 }).setView(p.home ? [p.home.lat, p.home.lon] : p.start ? [p.start.lat, p.start.lon] : CALGARY, p.home ? 12 : p.start?.zoom ?? 11)
     L.control.zoom({ position: 'bottomright' }).addTo(m)
-    const common = { updateWhenZooming: false, keepBuffer: 4 }
-    // A coarse copy underneath so tiles that are still loading show blurred imagery, not a blank map.
-    L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, { maxNativeZoom: 10, keepBuffer: 8, zIndex: 0, className: 'tiles-under' }).addTo(m)
-    L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, { ...common, maxZoom: 19, zIndex: 1, className: 'tiles-imagery', attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }).addTo(m)
-    L.tileLayer(`${ESRI}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`, { ...common, maxZoom: 19, zIndex: 2, className: 'tiles-roads' }).addTo(m)
-    L.tileLayer(`${ESRI}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, { ...common, maxZoom: 19, zIndex: 3 }).addTo(m)
     m.attributionControl.setPrefix(false)
+    m.createPane('labels').style.zIndex = '405'
     m.createPane('route').style.zIndex = '410'
     m.createPane('cams').style.zIndex = '420'
-    for (const k of ['allRoads', 'all', 'roads', 'route', 'progress', 'events', 'places', 'routeCams']) layers.current[k] = L.layerGroup().addTo(m)
+    // Community names thin out as you zoom out, so the city view stays readable.
+    const zoomClass = () => { const z = m.getZoom(); el.current!.dataset.z = z >= 13 ? 'near' : z >= 11.5 ? 'mid' : z >= 10.5 ? 'far' : 'out' }
+    m.on('zoomend', () => { zoomClass(); declutter() }); zoomClass()
+    for (const k of ['communities', 'allRoads', 'all', 'roads', 'route', 'progress', 'events', 'places', 'routeCams']) layers.current[k] = L.layerGroup().addTo(m)
 
     m.on('click', async (e) => {
       const { lat, lng } = e.latlng
@@ -68,13 +104,35 @@ export function MapView(p: Props) {
     return () => { ro.disconnect(); m.remove() }
   }, [])
 
+  // ── basemap: satellite or streets ──
+  useEffect(() => {
+    const m = map.current!
+    const tiles = basemapLayers(p.basemap).map((t) => t.addTo(m))
+    el.current!.dataset.basemap = p.basemap
+    return () => { tiles.forEach((t) => t.remove()) }
+  }, [p.basemap])
+
+  // ── Calgary communities: boundaries and names ──
+  useEffect(() => {
+    const g = layers.current.communities
+    g.clearLayers()
+    if (!p.communities.length) return
+    const renderer = L.canvas({ padding: 0.3 })
+    const color = p.basemap === 'streets' ? '#5b4bd6' : '#ffffff'
+    for (const c of p.communities) {
+      L.polygon(c.rings, { renderer, color, weight: 1.2, opacity: p.basemap === 'streets' ? 0.55 : 0.6, dashArray: '5 4', fill: false, interactive: false }).addTo(g)
+      L.marker(c.label, { pane: 'labels', interactive: false, keyboard: false, icon: L.divIcon({ className: `mk-comm is-${c.kind}`, html: `<span>${c.name}</span>`, iconSize: [0, 0] }) }).addTo(g)
+    }
+    declutter()
+  }, [p.communities, p.basemap])
+
   // ── every camera, quiet ──
   useEffect(() => {
     const g = layers.current.all
     g.clearLayers()
     const renderer = L.canvas({ padding: 0.3 })
     for (const c of p.cameras) {
-      L.circleMarker([c.lat, c.lon], { renderer, radius: 4, weight: 1.5, color: 'rgba(0,0,0,.7)', fillColor: c.src === 'ab' ? '#ab9dff' : '#e6eef8', fillOpacity: 0.9 })
+      L.circleMarker([c.lat, c.lon], { renderer, radius: 4, weight: 1.5, color: 'rgba(0,0,0,.7)', fillColor: c.src === 'ab' ? '#ab9dff' : c.src === 'town' ? '#ffb86b' : '#e6eef8', fillOpacity: 0.9 })
         .bindTooltip(c.name, { direction: 'top', className: 'tip', offset: [0, -4] })
         .on('click', (e) => { L.DomEvent.stop(e); cb.current.onCam(c.id) })
         .addTo(g)
@@ -86,7 +144,8 @@ export function MapView(p: Props) {
     const m = map.current!, g = layers.current.route, pl = layers.current.places
     g.clearLayers(); pl.clearLayers()
     if (p.home) L.marker([p.home.lat, p.home.lon], { icon: L.divIcon({ className: 'mk-home', html: '<span>⌂</span>', iconSize: [34, 34] }), zIndexOffset: 900 }).bindTooltip(p.home.label, { className: 'tip', direction: 'top', offset: [0, -16] }).addTo(pl)
-    if (!p.route) return
+    // No trip yet: keep the map on home, wherever in Alberta that is.
+    if (!p.route) { if (p.home) m.flyTo([p.home.lat, p.home.lon], Math.max(m.getZoom(), 12), { duration: 0.8 }); return }
     const ll = p.route.coords
     // Lines draw on canvas (no CSS filters), so the glow is a wide, faint cyan stroke underneath.
     L.polyline(ll, { pane: 'route', color: '#4cc9f0', opacity: 0.2, weight: 18, lineJoin: 'round', lineCap: 'round', interactive: false }).addTo(g)
@@ -190,6 +249,26 @@ export function MapView(p: Props) {
       progress.current.car.setLatLng(at)
     }
   }, [p.route, p.focusAlong])
+
+  // ── live location: dot, accuracy circle, and a heading cone while moving ──
+  useEffect(() => {
+    const m = map.current!
+    if (!p.me) { me.current?.dot.remove(); me.current?.acc.remove(); me.current = null; return }
+    const at: L.LatLngTuple = [p.me.lat, p.me.lon]
+    const moving = p.me.heading != null && !Number.isNaN(p.me.heading) && (p.me.speed ?? 0) > 1
+    if (!me.current) {
+      const acc = L.circle(at, { radius: p.me.acc, pane: 'route', color: '#3b9bff', weight: 1, opacity: 0.5, fillColor: '#3b9bff', fillOpacity: 0.12, interactive: false }).addTo(m)
+      const dot = L.marker(at, { pane: 'cams', interactive: false, keyboard: false, zIndexOffset: 1200, icon: L.divIcon({ className: 'mk-me', html: '<b></b><i></i><span></span>', iconSize: [22, 22] }) }).addTo(m)
+      me.current = { dot, acc }
+    }
+    me.current.acc.setLatLng(at).setRadius(p.me.acc)
+    me.current.dot.setLatLng(at)
+    const node = me.current.dot.getElement()
+    if (node) {
+      node.classList.toggle('is-moving', moving)
+      node.style.setProperty('--heading', `${moving ? p.me.heading : 0}deg`)
+    }
+  }, [p.me])
 
   useEffect(() => {
     if (p.flyTo && map.current) map.current.flyTo([p.flyTo.lat, p.flyTo.lon], p.flyTo.zoom ?? Math.max(map.current.getZoom(), 15), { duration: 0.8 })

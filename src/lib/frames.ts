@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react'
+import { isDirect } from './live'
 
 // Camera pictures. One batched call a minute for every camera on screen; only pictures newer than what we hold
 // come back. Each new picture is also kept in IndexedDB for the time-lapse (last 6 h, up to 120 per camera).
@@ -137,7 +138,8 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && Date.now() - snap.lastAt > PERIOD) tick()
 })
 
-export function watch(ids: string[]) {
+export function watch(all: string[]) {
+  const ids = all.filter((id) => !isDirect(id)) // Edmonton video and Banff pictures don't go through the picture proxy
   ids.forEach((id) => watched.set(id, (watched.get(id) ?? 0) + 1))
   if (!timer) timer = window.setTimeout(tick, PERIOD)
   fetchNew()

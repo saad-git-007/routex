@@ -4,10 +4,13 @@ import { ripple } from '../lib/ripple'
 import { useBump } from '../lib/useSeen'
 import { RoadLegend } from './AlertsPanel'
 import { Icon } from './Icon'
+import type { Basemap } from './MapView'
+import { Segmented } from './Segmented'
 
 // The map legend doubles as the filter: each swatch is a switch for that layer.
-export function MapLayers({ vis, setVis, counts, hasTrip, grades }: {
+export function MapLayers({ vis, setVis, counts, hasTrip, grades, basemap, setBasemap, names, setNames, namesCount }: {
   vis: Record<LayerKey, boolean>; setVis: (k: LayerKey, on: boolean) => void; counts: Partial<Record<LayerKey, number>>; hasTrip: boolean; grades: string[]
+  basemap: Basemap; setBasemap: (b: Basemap) => void; names: boolean; setNames: (on: boolean) => void; namesCount?: number
 }) {
   const [open, setOpen] = useState(() => !matchMedia('(max-width: 900px)').matches)
   const shown = LAYERS.filter((l) => hasTrip || !l.tripOnly)
@@ -22,6 +25,16 @@ export function MapLayers({ vis, setVis, counts, hasTrip, grades }: {
       </button>
       {open && (
         <div className="layers-body">
+          <div className="layers-group" role="group" aria-label="Map">
+            <span className="eyebrow-sm">Map</span>
+            <Segmented label="Basemap" className="seg-xs basemap-seg" value={basemap} onChange={setBasemap}
+              options={[{ value: 'sat', label: 'Satellite' }, { value: 'streets', label: 'Streets' }]} />
+            <button className="lchip has-rpl" aria-pressed={names} onPointerDown={ripple} onClick={() => setNames(!names)}>
+              <i className="sw sw-names" aria-hidden />
+              <span>Community names</span>
+              {names && namesCount != null && <span className="lchip-n tnum">{namesCount}</span>}
+            </button>
+          </div>
           {(['Cameras', 'On the road'] as const).map((g) => (
             <div key={g} className="layers-group" role="group" aria-label={g}>
               <span className="eyebrow-sm">{g}</span>

@@ -3,8 +3,8 @@
 
 export const UA = 'Mozilla/5.0 (compatible; routex-yyc.pages.dev)'
 
-// Calgary plus the highways out to Airdrie, Cochrane, Okotoks and Canmore.
-export const BOX = { s: 50.55, n: 51.65, w: -115.75, e: -113.3 }
+// All of Alberta (and the highway cameras right at its borders).
+export const BOX = { s: 48.95, n: 60.05, w: -120.1, e: -109.9 }
 export const inBox = (lat: number, lon: number) => lat > BOX.s && lat < BOX.n && lon > BOX.w && lon < BOX.e
 
 export const json = (body: unknown, maxAge: number, extra: Record<string, string> = {}) =>
@@ -16,7 +16,7 @@ export const json = (body: unknown, maxAge: number, extra: Record<string, string
 export async function cached(ctx: { request: Request; waitUntil(p: Promise<unknown>): void }, ttl: number, build: () => Promise<unknown>) {
   const cache = (caches as unknown as { default: Cache }).default
   const u = new URL(ctx.request.url)
-  u.searchParams.set('_v', '5') // bump when a response shape changes
+  u.searchParams.set('_v', '6') // bump when a response shape changes
   const key = new Request(u.toString(), { method: 'GET' })
   const hit = await cache.match(key)
   if (hit) return new Response(hit.body, { headers: { ...Object.fromEntries(hit.headers), 'x-edge': 'hit' } })
@@ -44,9 +44,9 @@ export async function ab511<T>(env: Env, what: string, ttl: number): Promise<T> 
   return r.json() as Promise<T>
 }
 
-/** Google encoded polyline → [lat, lon][], thinned to points at least ~40 m apart. */
+/** Google encoded polyline → [lat, lon][], simplified so no point is more than ~20 m off the original line. */
 export function decodePolyline(s: string): [number, number][] {
-  const out: [number, number][] = []
+  const pts: [number, number][] = []
   let i = 0, lat = 0, lon = 0
   while (i < s.length) {
     for (const which of [0, 1]) {
@@ -55,9 +55,28 @@ export function decodePolyline(s: string): [number, number][] {
       const d = result & 1 ? ~(result >> 1) : result >> 1
       if (which === 0) lat += d; else lon += d
     }
-    const p: [number, number] = [+(lat / 1e5).toFixed(5), +(lon / 1e5).toFixed(5)]
-    const last = out[out.length - 1]
-    if (!last || Math.abs(p[0] - last[0]) + Math.abs(p[1] - last[1]) > 0.0008) out.push(p)
+    pts.push([+(lat / 1e5).toFixed(4), +(lon / 1e5).toFixed(4)])
   }
-  return out
+  return simplify(pts, 0.0002)
+}
+
+/** Douglas–Peucker, in degrees (longitude scaled to Alberta's latitude). Highways are long and straight, so this drops most points. */
+function simplify(pts: [number, number][], tol: number): [number, number][] {
+  if (pts.length < 3) return pts
+  const k = 0.62, keep = new Uint8Array(pts.length)
+  keep[0] = keep[pts.length - 1] = 1
+  const stack: [number, number][] = [[0, pts.length - 1]]
+  while (stack.length) {
+    const [a, b] = stack.pop()!
+    const [ay, ax] = pts[a], by = pts[b][0] - ay, bx = (pts[b][1] - ax) * k
+    const len = Math.hypot(bx, by) || 1e-12
+    let far = -1, farD = tol
+    for (let j = a + 1; j < b; j++) {
+      const py = pts[j][0] - ay, px = (pts[j][1] - ax) * k
+      const d = Math.abs(px * by - py * bx) / len
+      if (d > farD) { farD = d; far = j }
+    }
+    if (far > 0) { keep[far] = 1; stack.push([a, far], [far, b]) }
+  }
+  return pts.filter((_, j) => keep[j])
 }

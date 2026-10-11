@@ -5,11 +5,36 @@ import { ago, kmIn } from '../lib/geo'
 import type { Camera, OnRoute, RoadCondition } from '../lib/types'
 import { useNow } from '../lib/useNow'
 import { Icon } from './Icon'
+import { banffUrl, isBanff, isDirect, isLive } from '../lib/live'
+import { LiveVideo } from './LiveVideo'
 
 export const STALE_MS = 15 * 60e3
 
 /** Cross-fades to each new picture so a refresh never flashes empty. */
 export function Shot({ id, alt, className }: { id: string; alt: string; className?: string }) {
+  if (isLive(id)) return <LiveVideo id={id} alt={alt} className={className} />
+  if (isBanff(id)) return <BanffStill id={id} alt={alt} className={className} />
+  return <Still id={id} alt={alt} className={className} />
+}
+
+// Banff pictures load straight from the town's server, a fresh copy each minute, cross-fading like the others.
+function BanffStill({ id, alt, className }: { id: string; alt: string; className?: string }) {
+  const minute = Math.floor(useNow(60e3) / 60e3)
+  const [shown, setShown] = useState<string[]>([])
+  const [error, setError] = useState(false)
+  const next = banffUrl(id, minute)
+  return (
+    <div className={`shot ${className ?? ''}`}>
+      {!shown.length && (error ? <div className="shot-empty"><Icon name="camera" size={22} /><span>No picture</span></div> : <div className="shot-loading" />)}
+      {shown.map((u, i) => <img key={u} src={u} alt={i === shown.length - 1 ? alt : ''} className={i === shown.length - 1 && shown.length > 1 ? 'in' : ''} draggable={false} />)}
+      {shown[shown.length - 1] !== next && (
+        <img key={next} src={next} alt="" hidden onLoad={() => { setError(false); setShown((s) => [...s.slice(-1), next]) }} onError={() => setError(true)} />
+      )}
+    </div>
+  )
+}
+
+function Still({ id, alt, className }: { id: string; alt: string; className?: string }) {
   const f = useFrame(id)
   const [layers, setLayers] = useState<string[]>([])
   const [fresh, setFresh] = useState(0)
@@ -32,6 +57,12 @@ export function Shot({ id, alt, className }: { id: string; alt: string; classNam
 }
 
 export function Freshness({ id }: { id: string }) {
+  if (isLive(id)) return <span className="fresh fresh-live"><i />Live video</span>
+  if (isBanff(id)) return <span className="fresh fresh-live"><i />Updates every minute</span>
+  return <Age id={id} />
+}
+
+function Age({ id }: { id: string }) {
   const f = useFrame(id)
   const now = useNow(5000)
   if (!f?.lm) return null
@@ -66,11 +97,11 @@ export function CameraCard({ cam, index, legLabel, road, active, onSelect, onTim
       <div className="cam-body">
         <div className="cam-title">
           <h3>{cam.name}</h3>
-          <p className="cam-meta"><span className="tnum">{kmIn(cam.along)}</span> · {legLabel}{cam.src === 'ab' && <span className="tag">511</span>}</p>
+          <p className="cam-meta"><span className="tnum">{kmIn(cam.along)}</span> · {legLabel}{cam.src !== 'city' && <span className="tag">{cam.src === 'ab' ? '511' : cam.area}</span>}</p>
           <RoadNote road={road} />
         </div>
         <button className="btn-icon btn-xs" onClick={onZoom} aria-label={`Zoom into ${cam.name}`} title="Zoom into the picture"><Icon name="zoomin" size={16} /></button>
-        <button className="btn-ghost btn-sm" onClick={onTimelapse} title="Time-lapse of the last hours"><Icon name="film" size={15} /> <span className="cam-tl-label">Time-lapse</span></button>
+        {!isDirect(cam.id) && <button className="btn-ghost btn-sm" onClick={onTimelapse} title="Time-lapse of the last hours"><Icon name="film" size={15} /> <span className="cam-tl-label">Time-lapse</span></button>}
       </div>
     </div>
   )

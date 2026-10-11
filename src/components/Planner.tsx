@@ -92,28 +92,27 @@ function PlannerView({ home, setHome, stops, setStops, saved, setSaved, shape, s
                 const leg = routeMatches ? route.legs[i] : undefined
                 const isOpen = open === p.id
                 return (
-                  <StopItem key={p.id} p={p} open={isOpen} canMove={list.length > 1} onMove={(d) => move(i, d)} label={p.label.split(',')[0]} first={i === 0} last={i === list.length - 1}>
-                    <div className="stop-row">
-                      <span className="node">D{i + 1}</span>
-                      <button className="stop-main" aria-expanded={isOpen} onClick={() => { setOpen(isOpen ? null : p.id); if (!isOpen) onFocus(p) }}>
-                        <span className="stop-label">{p.label.split(',')[0]}</span>
-                        <span className="stop-meta tnum">
-                          {leg ? <>{Math.round(leg.duration / 60)} min · {km(leg.distance)} · arrive {clock(arrive[i])}</> : p.label.split(',').slice(1, 3).join(',') || 'Destination'}
-                        </span>
-                      </button>
-                      <button
-                        className={`btn-icon btn-xs ${isSaved(p) ? 'is-on' : ''}`}
-                        aria-pressed={isSaved(p)}
-                        aria-label={isSaved(p) ? `Unsave ${p.label}` : `Save ${p.label}`}
-                        title={isSaved(p) ? 'Saved' : 'Save place'}
-                        onClick={() => setSaved((s) => (isSaved(p) ? s.filter((x) => !near(x, p)) : [...s, { ...p, id: crypto.randomUUID() }]))}
-                      >
-                        <Icon name="star" size={15} fill={isSaved(p)} />
-                      </button>
-                      <button className="btn-icon btn-xs" aria-label={`Remove ${p.label}`} title="Remove" onClick={() => setStops((s) => s.filter((x) => x.id !== p.id))}>
-                        <Icon name="x" size={15} />
-                      </button>
-                    </div>
+                  <StopItem key={p.id} p={p} open={isOpen} canMove={list.length > 1} onMove={(d) => move(i, d)} label={p.label.split(',')[0]} first={i === 0} last={i === list.length - 1} row={<>
+                    <span className="node">D{i + 1}</span>
+                    <button className="stop-main" aria-expanded={isOpen} onClick={() => { setOpen(isOpen ? null : p.id); if (!isOpen) onFocus(p) }}>
+                      <span className="stop-label">{p.label.split(',')[0]}</span>
+                      <span className="stop-meta tnum">
+                        {leg ? <><span>{Math.round(leg.duration / 60)} min · {km(leg.distance)}</span> <span>from {i === 0 ? 'Home' : `D${i}`}</span> <span>· arrive {clock(arrive[i])}</span></> : p.label.split(',').slice(1, 3).join(',') || 'Destination'}
+                      </span>
+                    </button>
+                    <button
+                      className={`btn-icon btn-xs ${isSaved(p) ? 'is-on' : ''}`}
+                      aria-pressed={isSaved(p)}
+                      aria-label={isSaved(p) ? `Unsave ${p.label}` : `Save ${p.label}`}
+                      title={isSaved(p) ? 'Saved' : 'Save place'}
+                      onClick={() => setSaved((s) => (isSaved(p) ? s.filter((x) => !near(x, p)) : [...s, { ...p, id: crypto.randomUUID() }]))}
+                    >
+                      <Icon name="star" size={15} fill={isSaved(p)} />
+                    </button>
+                    <button className="btn-icon btn-xs" aria-label={`Remove ${p.label}`} title="Remove" onClick={() => setStops((s) => s.filter((x) => x.id !== p.id))}>
+                      <Icon name="x" size={15} />
+                    </button>
+                  </>}>
                     <AnimatePresence initial={false}>{isOpen && (
                       <motion.div className="stop-preview-wrap" initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0, transition: { duration: 0.16, ease: [0.77, 0, 0.175, 1] } }} transition={{ type: 'spring', stiffness: 360, damping: 32, mass: 0.6 }}>
                       <div className="stop-preview">
@@ -128,7 +127,7 @@ function PlannerView({ home, setHome, stops, setStops, saved, setSaved, shape, s
               })}
             </AnimatePresence>
             {shape === 'round' && list.length > 0 && (
-              <li className="stop-return"><div className="stop-row"><span className="node node-home node-return"><Icon name="home" size={14} /></span><span className="stop-main is-static"><span className="stop-label">Back home</span>{routeMatches && <span className="stop-meta tnum">{Math.round(route.legs[route.legs.length - 1].duration / 60)} min · {km(route.legs[route.legs.length - 1].distance)} · arrive {clock(arrive[arrive.length - 1])}</span>}</span></div></li>
+              <li className="stop-return"><div className="stop-row"><span className="node node-home node-return"><Icon name="home" size={14} /></span><span className="stop-main is-static"><span className="stop-label">Back home</span>{routeMatches && <span className="stop-meta tnum"><span>{Math.round(route.legs[route.legs.length - 1].duration / 60)} min · {km(route.legs[route.legs.length - 1].distance)}</span> <span>from D{list.length}</span> <span>· arrive {clock(arrive[arrive.length - 1])}</span></span>}</span></div></li>
             )}
           </Reorder.Group>
 
@@ -164,8 +163,8 @@ function PlannerView({ home, setHome, stops, setStops, saved, setSaved, shape, s
 
 // One stop in the list. It drags only by its handle, so taps and scrolling on the rest of the row work as usual;
 // the handle also moves it with the arrow keys.
-function StopItem({ p, open, canMove, onMove, label, first, last, children }: {
-  p: Place; open: boolean; canMove: boolean; onMove: (d: number) => void; label: string; first: boolean; last: boolean; children: ReactNode
+function StopItem({ p, open, canMove, onMove, label, first, last, row, children }: {
+  p: Place; open: boolean; canMove: boolean; onMove: (d: number) => void; label: string; first: boolean; last: boolean; row: ReactNode; children: ReactNode
 }) {
   const controls = useDragControls()
   return (
@@ -176,14 +175,17 @@ function StopItem({ p, open, canMove, onMove, label, first, last, children }: {
       whileDrag={{ scale: 1.02, backgroundColor: 'rgba(24,31,44,.98)', boxShadow: '0 10px 30px rgba(0,0,0,.45)', zIndex: 5 }}
       className={`${open ? 'is-open' : ''} ${canMove ? 'can-move' : ''}`}
     >
+      <div className="stop-row">
+        {row}
+        {canMove && (
+          <button type="button" className="stop-grip" onPointerDown={(e) => { e.preventDefault(); controls.start(e) }}
+            onKeyDown={(e) => { if (e.key === 'ArrowUp' && !first) { e.preventDefault(); onMove(-1) } if (e.key === 'ArrowDown' && !last) { e.preventDefault(); onMove(1) } }}
+            aria-label={`Move ${label}: drag, or use the arrow keys`} title="Drag to change the order">
+            <Icon name="grip" size={18} />
+          </button>
+        )}
+      </div>
       {children}
-      {canMove && (
-        <button type="button" className="stop-grip" onPointerDown={(e) => { e.preventDefault(); controls.start(e) }}
-          onKeyDown={(e) => { if (e.key === 'ArrowUp' && !first) { e.preventDefault(); onMove(-1) } if (e.key === 'ArrowDown' && !last) { e.preventDefault(); onMove(1) } }}
-          aria-label={`Move ${label}: drag, or use the arrow keys`} title="Drag to change the order">
-          <Icon name="grip" size={18} />
-        </button>
-      )}
     </Reorder.Item>
   )
 }

@@ -120,6 +120,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .stops { list-style: none; margin: 0; padding: 0 0 0 3px; display: grid; gap: 2px; position: relative; }
 .stops:not(:empty)::before { content: ""; position: absolute; left: 16px; top: -10px; bottom: 14px; width: 1.5px; background: linear-gradient(var(--accent-line), var(--line)); }
 .stops li { position: relative; min-width: 0; }
+.stop-meta > span { white-space: nowrap; }
 .stop-row { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 2px 2px 2px 0; }
 .stop-main { flex: 1; min-width: 0; display: grid; justify-items: start; justify-content: stretch; align-content: center; gap: 1px; min-height: 44px; padding: 4px 8px; margin-left: -4px; border: 0; border-radius: var(--r-sm); background: transparent; text-align: left; white-space: normal; }
 .stop-main:hover:not(:disabled) { background: var(--accent-soft); }
@@ -942,8 +943,7 @@ html, body { touch-action: pan-x pan-y; }
 @media (max-width: 360px) { .top-actions { gap: 6px; } .btn-city { max-width: 96px; } }
 
 /* Stops: a drag handle on the right of each row changes the order. */
-.stops li.can-move > .stop-row { padding-right: 36px; }
-.stop-grip { position: absolute; top: 2px; right: 0; width: 34px; height: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: grab; touch-action: none; }
+.stop-grip { flex: none; margin-left: -6px; width: 34px; height: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: grab; touch-action: none; }
 .stop-grip:hover:not(:disabled) { background: transparent; color: var(--text); }
 .stop-grip:active { cursor: grabbing; color: var(--accent); }
 .stop-grip svg { stroke-width: 3.2; }

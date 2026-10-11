@@ -487,7 +487,7 @@ export default function App() {
               {tab === 'weather' && <WeatherPanel weather={weather} stations={routeStations} />}
             </>
           )}
-          <footer className="foot">Cameras: city traffic departments, provincial 511 services and DriveBC · Routing: OSRM · Weather: Open-Meteo · Maps: Esri</footer>
+          <footer className="foot">Cameras: city traffic departments, provincial 511 services and DriveBC · Routing: OSRM · Weather: Open-Meteo · Maps: Esri, HERE, Garmin, OpenStreetMap contributors · Imagery: Esri, Maxar, Earthstar Geographics</footer>
         </aside>
       </main>
 

@@ -88,12 +88,11 @@ export function MapView(p: Props) {
 
   // ── init ──
   useEffect(() => {
-    const m = L.map(el.current!, { zoomControl: false, preferCanvas: true, attributionControl: true, zoomSnap: 0.25, minZoom: 5, fadeAnimation: false }).setView(nearStart(p.home) ? [p.home!.lat, p.home!.lon] : p.start ? [p.start.lat, p.start.lon] : CALGARY, nearStart(p.home) ? 12 : p.start?.zoom ?? 11)
+    const m = L.map(el.current!, { zoomControl: false, preferCanvas: true, attributionControl: false, zoomSnap: 0.25, minZoom: 5, fadeAnimation: false }).setView(nearStart(p.home) ? [p.home!.lat, p.home!.lon] : p.start ? [p.start.lat, p.start.lon] : CALGARY, nearStart(p.home) ? 12 : p.start?.zoom ?? 11)
     L.control.zoom({ position: 'bottomright' }).addTo(m)
     const Stack = L.Control.extend({ onAdd: () => { const d = L.DomUtil.create('div', 'leaflet-control map-stack'); L.DomEvent.disableClickPropagation(d); return d } })
     const stack = new Stack({ position: 'bottomright' }).addTo(m)
     setStackEl(stack.getContainer()!)
-    m.attributionControl.setPrefix(false)
     m.createPane('labels').style.zIndex = '405'
     m.createPane('route').style.zIndex = '410'
     m.createPane('driven').style.zIndex = '411'

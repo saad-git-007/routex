@@ -17,9 +17,8 @@ export function PickMap({ cameras, picked, focus, onPick, view, pin }: {
   cb.current = onPick
 
   useEffect(() => {
-    const m = L.map(el.current!, { zoomControl: false, zoomSnap: 0.25, minZoom: 5, attributionControl: true }).setView([51.045, -114.07], 11)
+    const m = L.map(el.current!, { zoomControl: false, zoomSnap: 0.25, minZoom: 5, attributionControl: false }).setView([51.045, -114.07], 11)
     L.control.zoom({ position: 'topright' }).addTo(m)
-    m.attributionControl.setPrefix(false)
     L.tileLayer(`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 19, className: 'tiles-imagery', attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }).addTo(m)
     L.tileLayer(`${ESRI}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`, { maxZoom: 19 }).addTo(m)
     layer.current = L.layerGroup().addTo(m)

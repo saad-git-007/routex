@@ -1,5 +1,5 @@
-import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useState } from 'react'
+import { AnimatePresence, motion, Reorder, useDragControls } from 'motion/react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { satThumb } from '../lib/api'
 import { km } from '../lib/geo'
 import type { Place, Route, TripShape } from '../lib/types'
@@ -26,7 +26,11 @@ export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape
   const [open, setOpen] = useState<string | null>(null)
   // Show stops in the order they'll be driven once a route exists.
   const ordered = route ? route.order.slice(1, shape === 'round' ? -1 : undefined).map((p) => stops.find((s) => s.id === p.id)).filter((s): s is Place => !!s) : stops
-  const list = ordered.length === stops.length ? ordered : stops
+  // In "My stops" the list is the stops as you put them (so dragging one never waits for the route to come back).
+  const list = keepOrder || ordered.length !== stops.length ? stops : ordered
+  // Dragging a stop sets your own order, so the planner switches to "My stops".
+  const reorder = (next: Place[]) => { if (!keepOrder) setKeepOrder(true); setStops(() => next) }
+  const move = (i: number, d: number) => { const j = i + d; if (j < 0 || j >= list.length) return; const next = [...list]; [next[i], next[j]] = [next[j], next[i]]; reorder(next) }
   const isSaved = (p: Place) => saved.some((s) => near(s, p))
   const addStop = (p: Place) => setStops((s) => (s.some((x) => near(x, p)) ? s : [...s, p]))
   // Arrival at each stop if you left now (OSRM typical-traffic durations).
@@ -46,6 +50,21 @@ export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape
 
   return (
     <section className="planner card" aria-label="Trip">
+      {home && stops.length > 1 && (
+        <div className="opt-choice">
+          <Segmented
+            label="Stop order" value={keepOrder ? 'mine' : 'best'} onChange={(v) => setKeepOrder(v === 'mine')}
+            options={[{ value: 'mine', label: 'My stops' }, { value: 'best', label: 'Optimize route' }]}
+          />
+          <AnimatePresence>{(done || (routing && !keepOrder)) && (
+            <motion.div key="opt" className={`opt-note ${routing ? 'is-busy' : ''}`} role="status"
+              initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.25 } }}>
+              <Icon name={routing ? 'route' : 'check'} size={15} />
+              <p>{routing ? <span className="shiny">Optimizing {stops.length} stops…</span> : done}</p>
+            </motion.div>
+          )}</AnimatePresence>
+        </div>
+      )}
       <div className="planner-home">
         <span className="node node-home"><Icon name="home" size={16} /></span>
         {home && !editHome ? (
@@ -66,36 +85,13 @@ export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape
 
       {home && (
         <>
-          {stops.length > 1 && (
-            <div className="opt-choice">
-              <Segmented
-                label="Stop order" value={keepOrder ? 'mine' : 'best'} onChange={(v) => setKeepOrder(v === 'mine')}
-                options={[{ value: 'mine', label: 'My stops' }, { value: 'best', label: 'Optimize route' }]}
-              />
-              <AnimatePresence>{(done || (routing && !keepOrder)) && (
-                <motion.div key="opt" className={`opt-note ${routing ? 'is-busy' : ''}`} role="status"
-                  initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.25 } }}>
-                  <Icon name={routing ? 'route' : 'check'} size={15} />
-                  <p>{routing ? <span className="shiny">Optimizing {stops.length} stops…</span> : done}</p>
-                </motion.div>
-              )}</AnimatePresence>
-            </div>
-          )}
-          <ol className="stops" aria-label="Stops in driving order">
+          <Reorder.Group as="ol" axis="y" values={list} onReorder={reorder} className="stops" aria-label="Stops in driving order">
             <AnimatePresence initial={false}>
               {list.map((p, i) => {
                 const leg = routeMatches ? route.legs[i] : undefined
                 const isOpen = open === p.id
                 return (
-                  <motion.li
-                    key={p.id}
-                    layout="position"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0, transition: { duration: 0.12 } }}
-                    transition={{ layout: { type: 'spring', stiffness: 360, damping: 32, mass: 0.6 }, opacity: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } }}
-                    className={isOpen ? 'is-open' : ''}
-                  >
+                  <StopItem key={p.id} p={p} open={isOpen} canMove={list.length > 1} onMove={(d) => move(i, d)} label={p.label.split(',')[0]} first={i === 0} last={i === list.length - 1}>
                     <div className="stop-row">
                       <span className="node">D{i + 1}</span>
                       <button className="stop-main" aria-expanded={isOpen} onClick={() => { setOpen(isOpen ? null : p.id); if (!isOpen) onFocus(p) }}>
@@ -126,14 +122,14 @@ export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape
                       </div>
                       </motion.div>
                     )}</AnimatePresence>
-                  </motion.li>
+                  </StopItem>
                 )
               })}
             </AnimatePresence>
             {shape === 'round' && list.length > 0 && (
               <li className="stop-return"><div className="stop-row"><span className="node node-home node-return"><Icon name="home" size={14} /></span><span className="stop-main is-static"><span className="stop-label">Back home</span>{routeMatches && <span className="stop-meta tnum">{Math.round(route.legs[route.legs.length - 1].duration / 60)} min · {km(route.legs[route.legs.length - 1].distance)} · arrive {clock(arrive[arrive.length - 1])}</span>}</span></div></li>
             )}
-          </ol>
+          </Reorder.Group>
 
           <AddressSearch big placeholder={stops.length ? 'Add another destination' : 'Where are you driving?'} onPick={addStop} />
 
@@ -163,5 +159,31 @@ export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape
         </>
       )}
     </section>
+  )
+}
+
+// One stop in the list. It drags only by its handle, so taps and scrolling on the rest of the row work as usual;
+// the handle also moves it with the arrow keys.
+function StopItem({ p, open, canMove, onMove, label, first, last, children }: {
+  p: Place; open: boolean; canMove: boolean; onMove: (d: number) => void; label: string; first: boolean; last: boolean; children: ReactNode
+}) {
+  const controls = useDragControls()
+  return (
+    <Reorder.Item
+      value={p} dragListener={false} dragControls={controls}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.12 } }}
+      transition={{ layout: { type: 'spring', stiffness: 360, damping: 32, mass: 0.6 }, opacity: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } }}
+      whileDrag={{ scale: 1.02, backgroundColor: 'rgba(24,31,44,.98)', boxShadow: '0 10px 30px rgba(0,0,0,.45)', zIndex: 5 }}
+      className={`${open ? 'is-open' : ''} ${canMove ? 'can-move' : ''}`}
+    >
+      {children}
+      {canMove && (
+        <button type="button" className="stop-grip" onPointerDown={(e) => { e.preventDefault(); controls.start(e) }}
+          onKeyDown={(e) => { if (e.key === 'ArrowUp' && !first) { e.preventDefault(); onMove(-1) } if (e.key === 'ArrowDown' && !last) { e.preventDefault(); onMove(1) } }}
+          aria-label={`Move ${label}: drag, or use the arrow keys`} title="Drag to change the order">
+          <Icon name="grip" size={18} />
+        </button>
+      )}
+    </Reorder.Item>
   )
 }

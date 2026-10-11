@@ -941,3 +941,12 @@ html, body { touch-action: pan-x pan-y; }
 @media (prefers-reduced-motion: reduce) { .live-tag i { animation: none; } .live-fill, .live-me { transition: none; } }
 @media (max-width: 420px) { .lt-arr { display: none; } }
 @media (max-width: 360px) { .top-actions { gap: 6px; } .btn-city { max-width: 96px; } }
+
+/* Stops: a drag handle on the right of each row changes the order. */
+.stops li.can-move > .stop-row { padding-right: 36px; }
+.stop-grip { position: absolute; top: 2px; right: 0; width: 34px; height: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: grab; touch-action: none; }
+.stop-grip:hover:not(:disabled) { background: transparent; color: var(--text); }
+.stop-grip:active { cursor: grabbing; color: var(--accent); }
+.stop-grip svg { stroke-width: 3.2; }
+.planner > .opt-choice { margin-bottom: 4px; }
+.stops li { border-radius: var(--r-md); }

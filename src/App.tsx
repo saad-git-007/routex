@@ -254,8 +254,7 @@ export default function App() {
   const [liveOpen, setLiveOpen] = useStored<boolean>('liveOpen', true)
   // Under the map normally; over the map when it's full screen (the panel is hidden then).
   const liveCard = (overlay: boolean) => (
-    <LiveTrip route={route!} pos={live!} cams={routeCams} follow={follow} onFollow={() => setFollow(!follow)} open={liveOpen} setOpen={setLiveOpen} overlay={overlay}
-      onCam={(id) => { setActive(id); setSheet(id) }} />
+    <LiveTrip route={route!} pos={live!} follow={follow} onFollow={() => setFollow(!follow)} open={liveOpen} setOpen={setLiveOpen} overlay={overlay} />
   )
 
   // Full screen: the real thing where the browser allows it, a fixed overlay everywhere (iPhone Safari can't full-screen a div).

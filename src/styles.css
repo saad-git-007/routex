@@ -931,23 +931,11 @@ html, body { touch-action: pan-x pan-y; }
 .live-legbar::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 6px; margin-top: -3px; border-radius: 6px; background: var(--surface-3); }
 .live-legbar .live-fill { height: 6px; margin-top: -3px; border-radius: 6px; }
 .live-legbar .live-me { width: 18px; height: 18px; }
-.live-legtext { font-size: .78rem; color: var(--text-2); line-height: 1.4; }
-.live-legtext b { color: var(--text); font-weight: 600; }
 
 /* The whole trip */
-.live-bar { position: relative; height: 22px; margin: 0 10px; }
-.live-bar::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 3px; margin-top: -1.5px; border-radius: 3px; background: var(--surface-3); }
 .live-fill { position: absolute; left: 0; top: 50%; height: 3px; margin-top: -1.5px; border-radius: 3px; background: linear-gradient(90deg, #5b6577, var(--accent)); transition: width 600ms var(--ease-out); }
-.live-stop, .live-start { position: absolute; top: 50%; translate: -50% -50%; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #e3f8ff; color: var(--on-accent); font: 700 8px/1 var(--font-mono); letter-spacing: -.04em; box-shadow: 0 0 0 1.5px rgba(4,6,11,.9), 0 0 0 2.5px var(--accent); }
-.live-start, .live-stop.is-home { background: var(--home-grad); color: #eafff5; box-shadow: 0 0 0 1.5px rgba(4,6,11,.9), 0 0 0 2.5px #23a873; }
-.live-start { left: 0; }
-.live-stop.is-past:not(.is-home) { background: #8a94a6; box-shadow: 0 0 0 1.5px rgba(4,6,11,.9); }
-.live-stop.is-next { scale: 1.15; box-shadow: 0 0 0 1.5px rgba(4,6,11,.9), 0 0 0 2.5px var(--accent), 0 0 10px var(--accent); }
 .live-me { position: absolute; top: 50%; translate: -50% -50%; width: 14px; height: 14px; border-radius: 50%; background: #3b9bff; box-shadow: 0 0 0 2.5px #fff, 0 0 12px #3b9bff; transition: left 600ms var(--ease-out); z-index: 2; }
 
-.live-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 8px; min-width: 0; font-size: .74rem; color: var(--text-muted); }
-.live-cam { flex: none; display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--r-full); background: var(--surface-2); color: var(--text); font-size: .74rem; font-weight: 550; }
-.live-cam svg:first-child { color: var(--accent); }
 @media (max-width: 420px) { .live.is-overlay { left: 8px; right: 54px; bottom: calc(10px + env(safe-area-inset-bottom)); } .live-tag { padding: 3px 5px; font-size: 0; gap: 0; } .live-tag i { width: 8px; height: 8px; } }
 @media (prefers-reduced-motion: reduce) { .live-tag i { animation: none; } .live-fill, .live-me { transition: none; } }
 @media (max-width: 360px) { .top-actions { gap: 6px; } .btn-city { max-width: 96px; } }

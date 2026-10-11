@@ -871,7 +871,7 @@ html.is-map-full, html.is-map-full body { overflow: hidden; }
 .lvl-none { font-size: .82rem; color: var(--text-2); }
 
 /* Double tap opens a camera card full screen; stop the browser treating it as a page zoom. */
-.cam-hit { touch-action: manipulation; }
+.cam-hit { touch-action: pan-x pan-y; }
 
 /* Route cameras hidden by a switched-off layer. */
 .hidden-cams { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 12px; border-radius: var(--r-md); background: var(--review-soft); box-shadow: inset 0 0 0 1px var(--review-line); color: var(--review); font-size: .8rem; }
@@ -882,3 +882,7 @@ html.is-map-full, html.is-map-full body { overflow: hidden; }
 /* Zoom view hint: phones and tablets get the touch wording, computers the mouse one. */
 .hint-touch { display: none; }
 @media (pointer: coarse) { .hint-touch { display: inline; } .hint-mouse { display: none; } }
+
+/* No page zoom on touch screens: scrolling only. The map and the full-screen picture (touch-action: none)
+   still pinch-zoom themselves in script. */
+html, body { touch-action: pan-x pan-y; }

@@ -22,7 +22,7 @@ import { CamSheet } from './components/CamSheet'
 import { MapLayers } from './components/MapLayers'
 import { SavedRoutes, TripActions } from './components/TripActions'
 import { ZoomView } from './components/ZoomView'
-import { readTripLink, type SavedRoute } from './lib/trip'
+import { isApple, readTripLink, type SavedRoute } from './lib/trip'
 import { CameraList } from './components/CameraList'
 import { Icon } from './components/Icon'
 import { MapView, type Basemap } from './components/MapView'
@@ -233,14 +233,32 @@ export default function App() {
     return () => clearTimeout(t)
   }, [locError]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Map notes (location problems, the Home Screen tip) clear themselves.
+  useEffect(() => { if (!locMsg) return; const t = setTimeout(() => setLocMsg(''), 8000); return () => clearTimeout(t) }, [locMsg])
+  // Full-screen map. iPad Safari only has the webkit-prefixed Fullscreen API; iPhone Safari has none, so there the map
+  // fills the page (and a one-time tip says that adding RouteX to the Home Screen hides Safari's bars too).
   const toggleFull = () => {
-    if (!full) { setFull(true); mapCol.current?.requestFullscreen?.().catch(() => {}) }
-    else { setFull(false); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}) }
+    type WkEl = HTMLElement & { webkitRequestFullscreen?: () => void }
+    type WkDoc = Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void }
+    const el = mapCol.current as WkEl | null, doc = document as WkDoc
+    if (!full) {
+      setFull(true)
+      if (el?.requestFullscreen) el.requestFullscreen().catch(() => {})
+      else if (el?.webkitRequestFullscreen) el.webkitRequestFullscreen()
+      else if (isApple() && !matchMedia('(display-mode: standalone)').matches && !(navigator as Navigator & { standalone?: boolean }).standalone) {
+        try { if (!localStorage.getItem('ct:a2hs')) { localStorage.setItem('ct:a2hs', '1'); setLocMsg('Tip: for a true full screen with no Safari bars, tap Share, then Add to Home Screen, and open RouteX from there.') } } catch { /* private mode */ }
+      }
+    } else {
+      setFull(false)
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+      else if (doc.webkitFullscreenElement) doc.webkitExitFullscreen?.()
+    }
   }
   useEffect(() => {
-    const sync = () => { if (!document.fullscreenElement) setFull(false) }
-    document.addEventListener('fullscreenchange', sync)
-    return () => document.removeEventListener('fullscreenchange', sync)
+    const doc = document as Document & { webkitFullscreenElement?: Element }
+    const sync = () => { if (!document.fullscreenElement && !doc.webkitFullscreenElement) setFull(false) }
+    document.addEventListener('fullscreenchange', sync); document.addEventListener('webkitfullscreenchange', sync)
+    return () => { document.removeEventListener('fullscreenchange', sync); document.removeEventListener('webkitfullscreenchange', sync) }
   }, [])
   useEffect(() => {
     document.documentElement.classList.toggle('is-map-full', full)

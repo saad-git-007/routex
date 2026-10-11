@@ -348,7 +348,7 @@ export default function App() {
           <div className="top-stats" aria-live="polite">
             <span><b className="tnum">{mins(route.duration)}</b></span>
             <span className="dot-sep" />
-            <span className="tnum">{km(route.distance)}</span>
+            <span><b className="tnum">{km(route.distance)}</b></span>
             <LevelDetails level={level} reasons={reasons} events={routeEventsAll} alerts={alerts} />
           </div>
         )}
@@ -388,7 +388,7 @@ export default function App() {
             basemap={basemap} setBasemap={setBasemap} names={names} setNames={setNames} namesCount={communities?.length} nearCalgary={nearCalgary} />
           <div className="map-tools">
             {full && hasTrip && (
-              <span className="full-stats"><b className="tnum">{mins(route.duration)}</b> · <span className="tnum">{km(route.distance)}</span><span className={`level level-${level}`}><i />{LEVEL_TEXT[level]}</span></span>
+              <span className="full-stats"><b className="tnum">{mins(route.duration)}</b> · <b className="tnum">{km(route.distance)}</b><span className={`level level-${level}`}><i />{LEVEL_TEXT[level]}</span></span>
             )}
             {locMsg && !fix && <span className="loc-msg" role="status">{locMsg}</span>}
           </div>

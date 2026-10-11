@@ -167,7 +167,7 @@ export function MapView(p: Props) {
     L.polyline(ll, { pane: 'route', color: '#000', opacity: 0.6, weight: 9, lineJoin: 'round', lineCap: 'round', interactive: false }).addTo(g)
     L.polyline(ll, { pane: 'route', color: '#5fd4f5', opacity: 1, weight: 5, lineJoin: 'round', lineCap: 'round', interactive: false }).addTo(g)
     const stops = p.route.order.slice(1).filter((s) => s.id !== p.home?.id)
-    stops.forEach((s, i) => L.marker([s.lat, s.lon], { icon: L.divIcon({ className: 'mk-stop', html: `<span>${i + 1}</span>`, iconSize: [30, 30] }), zIndexOffset: 800 }).bindTooltip(s.label, { className: 'tip', direction: 'top', offset: [0, -14] }).addTo(pl))
+    stops.forEach((s, i) => L.marker([s.lat, s.lon], { icon: L.divIcon({ className: 'mk-stop', html: `<span>S${i + 1}</span>`, iconSize: [30, 30] }), zIndexOffset: 800 }).bindTooltip(s.label, { className: 'tip', direction: 'top', offset: [0, -14] }).addTo(pl))
     const b = L.latLngBounds(ll)
     if (nearStart({ lat: b.getCenter().lat, lon: b.getCenter().lng })) m.flyToBounds(b, { padding: [40, 40], duration: 0.8 })
   }, [p.route, p.home])

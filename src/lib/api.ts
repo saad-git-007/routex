@@ -99,12 +99,34 @@ export function bestOrder(d: number[][], shape: TripShape): number[] {
 const hwy = (ref: string) =>
   ref.split(/[;,]/).map((r) => r.trim().replace(/^(AB|Hwy|HWY|TCH)\s*/i, '')).filter((r) => /^\d{1,3}[A-Z]?$/i.test(r)).map((r) => `Hwy ${r.toUpperCase()}`)
 
-export async function planRoute(home: Place, stops: Place[], shape: TripShape, by: OptimizeBy = 'distance', keep = false, signal?: AbortSignal): Promise<Route> {
+// Routes are kept for the session (the last dozen), so switching between "My stops" and "Optimize route", or back to
+// an earlier trip, is instant. The app also works out the other order in the background (see App).
+const routes = new Map<string, Promise<Route>>()
+const tables = new Map<string, Promise<{ durations: (number | null)[][]; distances: (number | null)[][] }>>()
+function remember<T>(m: Map<string, Promise<T>>, key: string, make: () => Promise<T>) {
+  let p = m.get(key)
+  if (!p) {
+    p = make(); m.set(key, p); p.catch(() => m.delete(key))
+    if (m.size > 12) m.delete(m.keys().next().value!)
+  }
+  return p
+}
+export function planRoute(home: Place, stops: Place[], shape: TripShape, by: OptimizeBy = 'distance', keep = false, signal?: AbortSignal): Promise<Route> {
+  const key = JSON.stringify([ll([home, ...stops]), stops.map((s) => s.id), shape, by, keep])
+  const p = remember(routes, key, () => buildRoute(home, stops, shape, by, keep))
+  if (!signal) return p
+  return new Promise((res, rej) => {
+    signal.addEventListener('abort', () => rej(new DOMException('Aborted', 'AbortError')), { once: true })
+    p.then(res, rej)
+  })
+}
+
+async function buildRoute(home: Place, stops: Place[], shape: TripShape, by: OptimizeBy, keep: boolean, signal?: AbortSignal): Promise<Route> {
   let ordered = stops
   let opt: Route['opt'] = null
   if (stops.length > 1) {
     // One OSRM table call gives the drive between every pair of places; the order is then solved locally.
-    const t = await get<{ durations: (number | null)[][]; distances: (number | null)[][] }>(`${OSRM}/table/v1/driving/${ll([home, ...stops])}?annotations=duration,distance`, signal)
+    const t = await remember(tables, ll([home, ...stops]), () => get<{ durations: (number | null)[][]; distances: (number | null)[][] }>(`${OSRM}/table/v1/driving/${ll([home, ...stops])}?annotations=duration,distance`, signal))
     const m = (by === 'distance' ? t.distances : t.durations).map((row) => row.map((x) => (x == null ? 1e9 : x)))
     const best = bestOrder(m, shape)
     const entered = stops.map((_, i) => i + 1)

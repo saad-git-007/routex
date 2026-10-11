@@ -139,7 +139,11 @@ export default function App() {
     setRouting(true); setRouteError('')
     const t = setTimeout(() => {
       planRoute(home, stops, shape, by, keepOrder, ctl.signal)
-        .then((r) => { setRoute(r); setActive(null) })
+        .then((r) => {
+          setRoute(r); setActive(null)
+          // Have the other stop order ready, so flipping My stops / Optimize route doesn't wait on the router.
+          if (stops.length > 1) planRoute(home, stops, shape, by, !keepOrder).catch(() => {})
+        })
         .catch((e) => { if (!ctl.signal.aborted) setRouteError(e.message === 'No route' ? 'No drivable route between these places' : 'Routing is busy, trying again shortly') })
         .finally(() => !ctl.signal.aborted && setRouting(false))
     }, 250)
@@ -231,6 +235,12 @@ export default function App() {
   const [follow, setFollow] = useState(true)
   useEffect(() => { if (locOn) setFollow(true) }, [locOn])
   const liveOn = !!(live && route && locOn)
+  const [liveOpen, setLiveOpen] = useStored<boolean>('liveOpen', true)
+  // Under the map normally; over the map when it's full screen (the panel is hidden then).
+  const liveCard = (overlay: boolean) => (
+    <LiveTrip route={route!} pos={live!} cams={routeCams} follow={follow} onFollow={() => setFollow(!follow)} open={liveOpen} setOpen={setLiveOpen} overlay={overlay}
+      onCam={(id) => { setActive(id); setSheet(id) }} />
+  )
 
   // Full screen: the real thing where the browser allows it, a fixed overlay everywhere (iPhone Safari can't full-screen a div).
   // Live location: centre on the first fix after switching on; a blocked permission switches it back off.
@@ -367,10 +377,7 @@ export default function App() {
             )}
             {locMsg && !fix && <span className="loc-msg" role="status">{locMsg}</span>}
           </div>
-          {liveOn && !sheetCam && (
-            <LiveTrip route={route!} pos={live!} cams={routeCams} follow={follow} onFollow={() => setFollow(!follow)}
-              onCam={(id) => { setActive(id); setSheet(id) }} />
-          )}
+          {liveOn && full && !sheetCam && liveCard(true)}
           {a2hs && full && (
             <div className="a2hs" role="dialog" aria-labelledby="a2hs-h">
               <button className="btn-icon btn-xs a2hs-x" onClick={closeA2hs} aria-label="Close"><Icon name="x" size={16} /></button>
@@ -401,6 +408,7 @@ export default function App() {
         </div>
 
         <aside className="panel">
+          {liveOn && !full && liveCard(false)}
           <Planner
             home={home} setHome={setHome} stops={stops} setStops={setStops} saved={saved} setSaved={setSaved}
             shape={shape} setShape={setShape} keepOrder={keepOrder} setKeepOrder={setKeepOrder} route={route} routing={routing} error={routeError}

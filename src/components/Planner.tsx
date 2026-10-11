@@ -85,7 +85,8 @@ export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape
 
       {home && (
         <>
-          <Reorder.Group as="ol" axis="y" values={list} onReorder={reorder} className="stops" aria-label="Stops in driving order">
+          {routing && <div className="progress-line" aria-label="Finding the route" />}
+          <Reorder.Group as="ol" axis="y" values={list} onReorder={reorder} className={`stops ${routing ? 'is-busy' : ''}`} aria-busy={routing} aria-label="Stops in driving order">
             <AnimatePresence initial={false}>
               {list.map((p, i) => {
                 const leg = routeMatches ? route.legs[i] : undefined
@@ -154,7 +155,6 @@ export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape
               ]}
             />
           </div>
-          {routing && stops.length < 2 && <div className="progress-line" aria-label="Finding the route" />}
           {error && <p className="error-line"><Icon name="alert" size={15} /> {error}</p>}
         </>
       )}

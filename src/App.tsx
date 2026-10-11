@@ -15,6 +15,7 @@ import type { Camera, Community, OnRoute, OptimizeBy, Place, RoadEvent, Route, T
 import { AlertsPanel } from './components/AlertsPanel'
 import { AreaShow } from './components/AreaShow'
 import { QUADRANTS, type Area } from './lib/areas'
+import { LevelDetails } from './components/LevelDetails'
 import { BeforeILeave } from './components/BeforeILeave'
 import { NO_REPORT, STALE_MS } from './components/CameraCard'
 import { CamSheet } from './components/CamSheet'
@@ -285,7 +286,7 @@ export default function App() {
             <span><b className="tnum">{mins(route.duration)}</b></span>
             <span className="dot-sep" />
             <span className="tnum">{km(route.distance)}</span>
-            <span className={`level level-${level}`} title={reasons.join(' · ')}><i />{LEVEL_TEXT[level]}</span>
+            <LevelDetails level={level} reasons={reasons} events={routeEventsAll} alerts={alerts} />
           </div>
         )}
         <div className="top-actions">
@@ -415,7 +416,7 @@ export default function App() {
         onClose={() => { setCityOpen(false); if (cityKey == null) setCityKey('calgary') }} />
       <AreaShow open={areasOpen} onClose={() => setAreasOpen(false)} cameras={cameras} roads={roads} prov={prov} cityKey={cityKey} area={area} setArea={setArea}
         lists={camLists} setLists={setCamLists} listId={listId} setListId={setListId} onZoom={setZoom} />
-      {route && <BeforeILeave open={leaving} onClose={() => setLeaving(false)} route={route} cams={routeCams} events={routeEvents as OnRoute<RoadEvent>[]} camRoads={camRoads} weather={weather} level={level} reasons={reasons} onZoom={setZoom} />}
+      {route && <BeforeILeave open={leaving} onClose={() => setLeaving(false)} route={route} cams={routeCams} events={routeEvents as OnRoute<RoadEvent>[]} camRoads={camRoads} weather={weather} level={level} reasons={reasons} allEvents={routeEventsAll} alerts={alerts} onZoom={setZoom} />}
     </div>
   )
 }

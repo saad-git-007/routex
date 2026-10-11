@@ -103,7 +103,7 @@ export function CameraCard({ cam, index, legLabel, road, active, onSelect, onZoo
           <p className="cam-meta"><span className="tnum">{kmIn(cam.along)}</span> · {legLabel}{cam.src !== 'city' && <span className="tag">{cam.src === 'ab' ? '511' : cam.area}</span>}</p>
           <RoadNote road={road} />
         </div>
-        <button className="btn-icon btn-xs" onClick={onZoom} aria-label={`Zoom into ${cam.name}`} title="Zoom into the picture"><Icon name="zoomin" size={16} /></button>
+        <button className="btn-icon cam-zoom" onClick={onZoom} aria-label={`Zoom into ${cam.name}`} title="Zoom into the picture"><Icon name="zoomin" size={24} /></button>
       </div>
     </div>
   )

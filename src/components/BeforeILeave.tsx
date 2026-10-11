@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { LEVEL_TEXT, sky, type Level } from '../lib/conditions'
+import { sky, type Level } from '../lib/conditions'
 import { km, kmIn, mins } from '../lib/geo'
-import type { Camera, OnRoute, RoadCondition, RoadEvent, Route, Weather } from '../lib/types'
+import type { Alert, Camera, OnRoute, RoadCondition, RoadEvent, Route, Weather } from '../lib/types'
 import { Freshness, RoadNote, Shot } from './CameraCard'
 import { Icon } from './Icon'
+import { LevelDetails } from './LevelDetails'
 
 const DWELL = 5000
 
 // Full-screen, one camera per screen in driving order, auto-advancing. Glance through the whole drive in a minute.
-export function BeforeILeave({ open, onClose, route, cams, events, camRoads, weather, level, reasons, onZoom }: {
+export function BeforeILeave({ open, onClose, route, cams, events, camRoads, weather, level, reasons, allEvents, alerts, onZoom }: {
   open: boolean; onClose: () => void; route: Route; cams: OnRoute<Camera>[]; events: OnRoute<RoadEvent>[]; camRoads: Map<string, RoadCondition | null>
-  weather: Weather[]; level: Level; reasons: string[]; onZoom: (c: Camera) => void
+  weather: Weather[]; level: Level; reasons: string[]; allEvents: OnRoute<RoadEvent>[]; alerts: Alert[]; onZoom: (c: Camera) => void
 }) {
   const dlg = useRef<HTMLDialogElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
@@ -74,7 +75,7 @@ export function BeforeILeave({ open, onClose, route, cams, events, camRoads, wea
             <div className="bil-head">
               <p className="eyebrow">Cameras on your route</p>
               <h2><span className="tnum">{mins(route.duration)}</span> <em>· {km(route.distance)}</em></h2>
-              <p className={`level level-${level}`}><i />{LEVEL_TEXT[level]}{reasons.length ? <span> · {reasons.slice(0, 3).join(' · ')}</span> : null}</p>
+              <LevelDetails level={level} reasons={reasons} events={allEvents} alerts={alerts} showReasons />
               {weather.length > 0 && (
                 <p className="bil-wx"><Icon name={sky(weather[0].code).icon} size={16} /> {sky(weather[0].code).text} · <span className="tnum">{Math.round(Math.min(...temps))}°–{Math.round(Math.max(...temps))}°</span></p>
               )}

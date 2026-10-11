@@ -848,3 +848,22 @@ html.is-map-full, html.is-map-full body { overflow: hidden; }
 @media (max-width: 420px) { .city-card h2 { font-size: 1.35rem; } .city-list { height: 210px; } }
 .pick-address { margin-top: 10px; }
 .pick-address .search { width: 100%; }
+
+/* Camera card: a bigger zoom button. */
+.cam-zoom { flex: none; width: 44px; height: 44px; min-height: 44px; color: var(--text); }
+
+/* The route's Clear / Caution pill opens what's behind it. */
+.lvl { position: relative; display: inline-block; max-width: 100%; }
+.lvl-btn { border: 0; cursor: pointer; text-align: left; }
+.lvl-btn svg { flex: none; opacity: .8; }
+.lvl-pop { position: absolute; z-index: 1700; top: calc(100% + 6px); left: 0; width: min(360px, calc(100vw - 32px)); max-height: min(60vh, 460px); overflow-y: auto; overscroll-behavior: contain;
+  display: grid; gap: 12px; padding: 12px; border-radius: var(--r-lg); background: var(--surface-1); box-shadow: var(--elev-3), inset 0 0 0 1px var(--line); text-align: left; }
+.top-stats .lvl-pop { left: auto; right: 0; }
+.lvl-pop section { display: grid; gap: 6px; }
+.lvl-item { display: grid; gap: 2px; padding: 8px 10px; border-radius: var(--r-md); background: var(--surface-2); border-left: 3px solid var(--line-strong); }
+.lvl-item b { font-size: .84rem; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.lvl-item p { font-size: .78rem; line-height: 1.4; color: var(--text-2); overflow-wrap: anywhere; }
+.lvl-item small { font-size: .72rem; color: var(--text-muted); }
+.lvl-item.kind-closure, .lvl-item.kind-incident, .lvl-item.is-high { border-left-color: var(--danger); }
+.lvl-item.kind-construction { border-left-color: var(--review); }
+.lvl-none { font-size: .82rem; color: var(--text-2); }

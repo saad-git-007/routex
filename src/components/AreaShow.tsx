@@ -150,6 +150,10 @@ function AreaShowView({ open, onClose, cameras, roads: abRoads, prov, cityKey, a
       if (['ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(i + 1) }
       if (['ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); go(i - 1) }
     }}>
+      {open && (
+        <button className="btn-icon bil-x" aria-label="Close" title="Close"
+          onClick={() => { if (edit?.ids.length && !confirm('Close without saving this list?')) return; dlg.current?.close() }}><Icon name="x" /></button>
+      )}
       {open && edit && (
         <>
           <aside className="bil-rail">
@@ -269,7 +273,6 @@ function AreaShowView({ open, onClose, cameras, roads: abRoads, prov, cityKey, a
             <button className="btn-icon bil-step" onClick={() => go(i + 1)} aria-label="Next camera" disabled={i >= cams.length - 1}><Icon name="down" /></button>
             <span className="bil-swipe" aria-hidden><Icon name="swipe" size={18} /> Swipe up or down</span>
             <span className="bil-progress" aria-hidden>{playing && <i key={`${listId ?? area}-${i}-${cycle}`} style={{ animationDuration: `${DWELL}ms` }} />}</span>
-            <button className="btn-icon" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" /></button>
           </div>
         </>
       )}

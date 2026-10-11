@@ -72,6 +72,7 @@ function BeforeILeaveView({ open, onClose, route, cams, events, camRoads, weathe
     }}>
       {open && (
         <>
+          <button className="btn-icon bil-x" onClick={() => dlg.current?.close()} aria-label="Close" title="Close"><Icon name="x" /></button>
           <aside className="bil-rail">
             <div className="bil-head">
               <p className="eyebrow">Cameras on your route</p>
@@ -123,7 +124,6 @@ function BeforeILeaveView({ open, onClose, route, cams, events, camRoads, weathe
             <button className="btn-icon bil-step" onClick={() => go(i + 1)} aria-label="Next camera" disabled={i >= cams.length - 1}><Icon name="down" /></button>
             <span className="bil-swipe" aria-hidden><Icon name="swipe" size={18} /> Swipe up or down</span>
             <span className="bil-progress" aria-hidden>{playing && <i key={`${i}-${cycle}`} style={{ animationDuration: `${DWELL}ms` }} />}</span>
-            <button className="btn-icon" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" /></button>
           </div>
         </>
       )}

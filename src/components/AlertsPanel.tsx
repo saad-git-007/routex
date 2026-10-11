@@ -1,7 +1,7 @@
 import { memo, useState, useMemo } from 'react'
 import { GRADE_COLOR, GRADES, roadGrade, roadIsGood } from '../lib/conditions'
 import { ago, km, kmIn, onRoute, extent } from '../lib/geo'
-import type { OnRoute, RoadCondition, RoadEvent, Route } from '../lib/types'
+import type { Alert, OnRoute, RoadCondition, RoadEvent, Route } from '../lib/types'
 import { useNow } from '../lib/useNow'
 import { useNewIds } from '../lib/useSeen'
 import { Icon, type IconName } from './Icon'
@@ -34,8 +34,8 @@ function along(route: Route, roads: RoadCondition[]) {
   }).filter((x) => x.to - x.from > 200).sort((a, b) => a.from - b.from)
 }
 
-function AlertsPanelView({ events, roads, highways, route, onShow, onShowRoad, selected }: {
-  events: OnRoute<RoadEvent>[]; roads: RoadCondition[]; highways: string[]; route: Route
+function AlertsPanelView({ notices, events, roads, highways, route, onShow, onShowRoad, selected }: {
+  notices: Alert[]; events: OnRoute<RoadEvent>[]; roads: RoadCondition[]; highways: string[]; route: Route
   onShow: (e: RoadEvent) => void; onShowRoad: (r: RoadCondition) => void; selected: string | null
 }) {
   const now = useNow(30000)
@@ -47,7 +47,16 @@ function AlertsPanelView({ events, roads, highways, route, onShow, onShowRoad, s
 
   return (
     <div className="alerts">
-      {sorted.length === 0 ? (
+      {/* Province-wide warnings, such as a snowfall warning. */}
+      {notices.map((a) => { const k = `n${a.id}`; return (
+        <section key={a.id} className={`alert-banner ${a.high ? 'high' : ''}`}>
+          <button className="alert-head" onClick={() => setOpen(open === k ? null : k)} aria-expanded={open === k}>
+            <Icon name="alert" size={16} /><span>{a.title}</span><Icon name={open === k ? 'up' : 'down'} size={15} />
+          </button>
+          {open === k && <p>{a.notes}{a.end ? ` Until ${a.end.replace(/\.$/, '')}.` : ''}</p>}
+        </section>
+      ) })}
+      {sorted.length === 0 ? (notices.length ? null :
         <div className="quiet"><Icon name="road" size={20} /><p>Nothing reported on your route.</p></div>
       ) : (
         <ul className="ev-list">

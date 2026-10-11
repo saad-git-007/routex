@@ -135,7 +135,6 @@ export default function App() {
   const abRoads = roadData?.roads ?? NONE
   const events = evData?.events ?? NONE
   const alerts = evData?.alerts ?? NONE
-  const [alertOpen, setAlertOpen] = useState(false)
 
   // ── route: re-plan when home, stops or shape change ──
   const stopKey = stops.map((s) => s.id).join(',')
@@ -330,7 +329,7 @@ export default function App() {
   const showEvent = useCallback((e: RoadEvent) => { setSelEvent(e.id); setFlyTo({ lat: e.lat, lon: e.lon, zoom: 16, n: Date.now() }) }, [])
   const onEvent = (id: string) => { const e = events.find((x) => x.id === id); if (e) { setTab('alerts'); showEvent(e) } }
 
-  const alertCount = routeEvents.length + shownRoads.filter((r) => !roadIsGood(r)).length
+  const alertCount = alerts.length + routeEvents.length + shownRoads.filter((r) => !roadIsGood(r)).length
   const hasTrip = !!route && !!home
   const alertBump = useBump(alertCount)
 
@@ -431,18 +430,28 @@ export default function App() {
             onFocus={focusPlace}
           />
 
-          <SavedRoutes routes={savedRoutes} setRoutes={setSavedRoutes} onLoad={loadRoute} />
+          {hasTrip && (
+            <>
+              <TripActions route={route} home={home} stops={stops} shape={shape} by={by} routes={savedRoutes} setRoutes={setSavedRoutes} />
 
-          {alerts.length > 0 && (
-            <section className={`alert-banner ${alerts.some((a) => a.high) ? 'high' : ''}`}>
-              <button className="alert-head" onClick={() => setAlertOpen(!alertOpen)} aria-expanded={alertOpen}>
-                <Icon name="alert" size={16} />
-                <span>{alerts[0].title}{alerts.length > 1 ? ` · +${alerts.length - 1}` : ''}</span>
-                <Icon name={alertOpen ? 'up' : 'down'} size={15} />
-              </button>
-              {alertOpen && alerts.map((a) => <p key={a.id}><b>{a.title}</b> {a.notes}{a.end ? ` Until ${a.end}.` : ''}</p>)}
-            </section>
+              <div className="stats card">
+                <div className="stat"><strong><NumberTicker value={Math.round(route.duration / 60)} /></strong><span>min</span></div>
+                <div className="stat"><strong><NumberTicker value={route.distance / 1000} decimals={1} /></strong><span>km</span></div>
+                <div className="stat"><strong><NumberTicker value={routeCams.length} /></strong><span>cameras</span></div>
+                <div className={`stat ${alertCount ? 'is-alert' : ''}`}><strong><NumberTicker value={alertCount} /></strong><span>alerts</span></div>
+              </div>
+
+              {hiddenCams.length > 0 && (
+                <div className="hidden-cams" role="status">
+                  <Icon name="layers" size={16} />
+                  <p><b>{hiddenCams.reduce((a, x) => a + x.n, 0)} {hiddenCams.reduce((a, x) => a + x.n, 0) === 1 ? 'camera' : 'cameras'} on this route {hiddenCams.reduce((a, x) => a + x.n, 0) === 1 ? 'is' : 'are'} hidden.</b> {hiddenCams.map((x) => layerLabel(x.k, prov)).join(' and ')} {hiddenCams.length === 1 ? 'is' : 'are'} switched off in Layers.</p>
+                  <button className="btn-sm" onClick={() => hiddenCams.forEach((x) => setVis(x.k, true))}>Turn on</button>
+                </div>
+              )}
+            </>
           )}
+
+          <SavedRoutes routes={savedRoutes} setRoutes={setSavedRoutes} onLoad={loadRoute} />
 
           {!hasTrip ? (
             <section className="empty card">
@@ -458,23 +467,6 @@ export default function App() {
             </section>
           ) : (
             <>
-              <div className="stats card">
-                <div className="stat"><strong><NumberTicker value={Math.round(route.duration / 60)} /></strong><span>min</span></div>
-                <div className="stat"><strong><NumberTicker value={route.distance / 1000} decimals={1} /></strong><span>km</span></div>
-                <div className="stat"><strong><NumberTicker value={routeCams.length} /></strong><span>cameras</span></div>
-                <div className={`stat ${alertCount ? 'is-alert' : ''}`}><strong><NumberTicker value={alertCount} /></strong><span>alerts</span></div>
-              </div>
-
-              {hiddenCams.length > 0 && (
-                <div className="hidden-cams" role="status">
-                  <Icon name="layers" size={16} />
-                  <p><b>{hiddenCams.reduce((a, x) => a + x.n, 0)} {hiddenCams.reduce((a, x) => a + x.n, 0) === 1 ? 'camera' : 'cameras'} on this route {hiddenCams.reduce((a, x) => a + x.n, 0) === 1 ? 'is' : 'are'} hidden.</b> {hiddenCams.map((x) => layerLabel(x.k, prov)).join(' and ')} {hiddenCams.length === 1 ? 'is' : 'are'} switched off in Layers.</p>
-                  <button className="btn-sm" onClick={() => hiddenCams.forEach((x) => setVis(x.k, true))}>Turn on</button>
-                </div>
-              )}
-
-              <TripActions route={route} home={home} stops={stops} shape={shape} by={by} routes={savedRoutes} setRoutes={setSavedRoutes} />
-
               <div className="tabs-sticky">
                 <Segmented
                   label="View" className="tabs" value={tab} onChange={setTab}
@@ -491,7 +483,7 @@ export default function App() {
               ) : (
                 <div className="quiet"><Icon name="camera" size={20} /><p>{routeCamsAll.length ? 'Every camera on this route is in a layer that is switched off. Turn it on above or in Layers on the map.' : `No cameras within ${CAM_RADIUS} m of this route.`}</p></div>
               ))}
-              {tab === 'alerts' && <AlertsPanel events={routeEvents} roads={shownRoads} highways={route.highways} route={route} onShowRoad={showRoad} onShow={showEvent} selected={selEvent} />}
+              {tab === 'alerts' && <AlertsPanel notices={alerts} events={routeEvents} roads={shownRoads} highways={route.highways} route={route} onShowRoad={showRoad} onShow={showEvent} selected={selEvent} />}
               {tab === 'weather' && <WeatherPanel weather={weather} stations={routeStations} />}
             </>
           )}

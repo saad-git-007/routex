@@ -127,7 +127,9 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .stop-main.is-static:hover { background: transparent; }
 .stop-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .92rem; font-weight: 550; color: var(--text); }
 .stop-meta { max-width: 100%; font-size: .76rem; font-weight: 400; color: var(--text-muted); }
-.stops li.is-open .node { background: var(--accent); color: var(--on-accent); }
+/* Stop badges match the map's stop markers: white circle, dark number, blue ring. */
+.stop-row > .node:not(.node-home) { width: 30px; height: 30px; background: #e3f8ff; color: var(--on-accent); font: 700 11px/1 var(--font-mono); box-shadow: 0 0 0 2px rgba(4,6,11,.85), 0 0 0 3.5px var(--accent); }
+.stops li.is-open .stop-row > .node:not(.node-home) { box-shadow: 0 0 0 2px rgba(4,6,11,.85), 0 0 0 3.5px var(--accent), 0 0 12px var(--accent); }
 .stop-return .stop-label { color: var(--text-muted); font-weight: 500; }
 .stop-preview { display: grid; gap: 6px; margin: 2px 0 10px 38px; padding: 8px; border-radius: var(--r-md); background: var(--surface-2); box-shadow: var(--elev-1); }
 .stop-preview > p { font-size: .82rem; color: var(--text-2); overflow-wrap: anywhere; }

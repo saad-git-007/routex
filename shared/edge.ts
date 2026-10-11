@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 // Helpers shared by the Pages Functions: an edge cache wrapper and the Calgary region box.
 
-export const UA = 'Mozilla/5.0 (compatible; routex-yyc.pages.dev)'
+export const UA = 'Mozilla/5.0 (compatible; routex-ca.pages.dev)'
 
 // All of Alberta (and the highway cameras right at its borders).
 export const BOX = { s: 48.95, n: 60.05, w: -120.1, e: -109.9 }

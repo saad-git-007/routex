@@ -6,6 +6,8 @@ import { UA } from '../../shared/edge'
 
 const MAX = 40
 const source = (id: string) => {
+  const g = id.match(/^([oty])(\d{1,7})$/)
+  if (g) return g[1] === 'o' ? `https://511on.ca/map/Cctv/${g[2]}` : g[1] === 't' ? `https://opendata.toronto.ca/transportation/tmc/rescucameraimages/CameraImages/loc${g[2]}.jpg` : `https://ww5.yorkmaps.ca/webtrafficimages/loc${g[2]}.jpg`
   const m = id.match(/^([ca])(\d{1,6})$/)
   if (!m) return null
   return m[1] === 'c' ? `https://trafficcam.calgary.ca/loc${m[2]}.jpg` : `https://511.alberta.ca/map/Cctv/${m[2]}`

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AREAS, QUADRANTS, REGIONS, areaOf, spread, type Area } from '../lib/areas'
+import { QUADRANTS, areaOf, spread, type Area } from '../lib/areas'
+import { citiesWithCameras, cityOf, cityZoom } from '../lib/cities'
+import { sourceLabel } from '../lib/layers'
 import { roadAt } from '../lib/conditions'
 import { useFrames, useWatch } from '../lib/frames'
 import type { CamList } from '../lib/lists'
@@ -12,24 +14,26 @@ import { Segmented } from './Segmented'
 const DWELL = 5000
 
 type Edit = { id: string | null; name: string; ids: string[] }
-const areaLabel = (c: Camera) => AREAS.find((a) => a.key === areaOf(c))!.label
-const isCalgary = (a: Area | '') => QUADRANTS.some((q) => q.key === a)
+const areaLabel = (c: Camera) => cityOf(c)?.name ?? sourceLabel(c)
+type CityRow = ReturnType<typeof citiesWithCameras>[number]
 
-// Calgary (then its quadrants) or one of Alberta's regions.
-function Places({ value, onPick }: { value: Area | ''; onPick: (a: Area) => void }) {
+// Any city in the chosen province that has cameras.
+function CitySelect({ cities, value, onPick, label }: { cities: CityRow[]; value: string; onPick: (key: string) => void; label: string }) {
   return (
-    <div className="area-places" role="group" aria-label="Place">
-      <button className="lchip has-rpl" aria-pressed={isCalgary(value)} onClick={() => onPick(isCalgary(value) ? (value as Area) : 'ne')}>Calgary</button>
-      {REGIONS.map((r) => <button key={r.key} className="lchip has-rpl" aria-pressed={value === r.key} onClick={() => onPick(r.key)}>{r.short}</button>)}
-    </div>
+    <label className="area-city">
+      <Icon name="pin" size={15} />
+      <select value={value} onChange={(e) => onPick(e.target.value)} aria-label={label}>
+        {cities.map((c) => <option key={c.key} value={c.key}>{c.name} · {c.cams} {c.cams === 1 ? 'camera' : 'cameras'}</option>)}
+      </select>
+    </label>
   )
 }
 
-// Full screen, like Before I leave: five cameras spread across one part of the city, one per screen,
+// Full screen, like Before I leave: five cameras spread across a city (or one part of Calgary), one per screen,
 // or a list of cameras the viewer picked on a map and saved in this browser.
-export function AreaShow({ open, onClose, cameras, roads, area, setArea, lists, setLists, listId, setListId, onZoom }: {
+export function AreaShow({ open, onClose, cameras, roads, cityKey, area, setArea, lists, setLists, listId, setListId, onZoom }: {
   open: boolean; onClose: () => void; cameras: Camera[]; roads: RoadCondition[]
-  area: Area; setArea: (a: Area) => void
+  cityKey: string | null; area: Area; setArea: (a: Area) => void
   lists: CamList[]; setLists: (f: (l: CamList[]) => CamList[]) => void; listId: string | null; setListId: (id: string | null) => void
   onZoom: (c: Camera) => void
 }) {
@@ -42,21 +46,30 @@ export function AreaShow({ open, onClose, cameras, roads, area, setArea, lists, 
 
   const { frames } = useFrames()
   const byId = useMemo(() => new Map(cameras.map((c) => [c.id, c])), [cameras])
-  const list = lists.find((l) => l.id === listId)
-  const inArea = useMemo(() => cameras.filter((c) => areaOf(c) === area), [cameras, area])
+  // Lists made in another province stay saved but are only offered where their cameras are.
+  const shownLists = lists.filter((l) => l.ids.some((id) => byId.has(id)))
+  const list = shownLists.find((l) => l.id === listId)
+  const cities = useMemo(() => citiesWithCameras(cameras), [cameras])
+  const [viewKey, setViewKey] = useState(cityKey ?? 'calgary')
+  const view = cities.find((c) => c.key === viewKey) ?? cities.find((c) => c.key === cityKey) ?? cities[0]
+  const isCgy = view?.key === 'calgary'
+  const inArea = useMemo(() => cameras.filter((c) => cityOf(c)?.key === view?.key && (!isCgy || areaOf(c) === area)), [cameras, view, isCgy, area])
   // Cameras whose picture failed are left out, so a dead feed gets replaced by its neighbour.
   const offline = inArea.filter((c) => frames.get(c.id)?.error).map((c) => c.id).join()
   const listCams = useMemo(() => (list ? list.ids.map((id) => byId.get(id)).filter((c): c is Camera => !!c) : []), [list, byId])
   const areaCams = useMemo(() => spread(inArea.filter((c) => !offline.includes(c.id))), [inArea, offline])
   const cams = list ? listCams : areaCams
-  const info = AREAS.find((a) => a.key === area)!
+  const title = isCgy ? QUADRANTS.find((a) => a.key === area)!.label : view?.name ?? 'Areas'
 
   // Building or editing a list: a map of every camera, tap to add or remove.
   const [edit, setEdit] = useState<Edit | null>(null)
   const [focus, setFocus] = useState<string | null>(null)
-  const [jump, setJump] = useState<Area | ''>('')
+  const [jump, setJump] = useState<{ city: string; quad: Area | '' }>({ city: '', quad: '' })
   const [pickView, setPickView] = useState<{ center: [number, number]; zoom: number; n: number } | null>(null)
-  const startEdit = (l?: CamList) => { setEdit(l ? { id: l.id, name: l.name, ids: [...l.ids] } : { id: null, name: '', ids: [] }); setFocus(null); setJump(''); setPlaying(false) }
+  const startEdit = (l?: CamList) => {
+    setEdit(l ? { id: l.id, name: l.name, ids: [...l.ids] } : { id: null, name: '', ids: [] }); setFocus(null); setPlaying(false)
+    if (view) jumpCity(view.key)
+  }
   const toggle = (id: string) => {
     setEdit((e) => e && { ...e, ids: e.ids.includes(id) ? e.ids.filter((x) => x !== id) : [...e.ids, id] })
     setFocus(id)
@@ -73,16 +86,20 @@ export function AreaShow({ open, onClose, cameras, roads, area, setArea, lists, 
     setLists((ls) => ls.filter((x) => x.id !== l.id)); setListId(null)
   }
   const focused = focus ? byId.get(focus) : undefined
-  const jumpTo = (a: Area) => { const x = AREAS.find((y) => y.key === a)!; setJump(a); setPickView({ center: x.center, zoom: x.calgary ? x.zoom + 0.5 : x.zoom, n: Date.now() }) }
+  function jumpCity(key: string) {
+    const c = cities.find((x) => x.key === key)
+    if (c) { setJump({ city: key, quad: '' }); setPickView({ center: [c.lat, c.lon], zoom: cityZoom(c) + 0.5, n: Date.now() }) }
+  }
+  const jumpQuad = (a: Area) => { const x = QUADRANTS.find((y) => y.key === a)!; setJump({ city: 'calgary', quad: a }); setPickView({ center: x.center, zoom: x.zoom + 0.5, n: Date.now() }) }
 
   useWatch(open ? (edit ? (focus ? [focus] : []) : cams.map((c) => c.id)) : [])
 
   const restart = () => { setI(0); setPlaying(!reduced()); scroller.current?.scrollTo({ top: 0 }) }
   useEffect(() => {
-    if (open) { dlg.current?.showModal(); requestAnimationFrame(() => scroller.current?.focus({ preventScroll: true })); restart() }
+    if (open) { setViewKey(cityKey ?? 'calgary'); dlg.current?.showModal(); requestAnimationFrame(() => scroller.current?.focus({ preventScroll: true })); restart() }
     else { dlg.current?.close(); setEdit(null) }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (open && !edit) restart() }, [area, listId, edit]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (open && !edit) restart() }, [area, listId, edit, viewKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const root = scroller.current
@@ -131,8 +148,8 @@ export function AreaShow({ open, onClose, cameras, roads, area, setArea, lists, 
               <p className="eyebrow">{edit.id ? 'Edit list' : 'New list'}</p>
               <input className="pick-name" value={edit.name} maxLength={40} placeholder="Name this list"
                 onChange={(e) => setEdit({ ...edit, name: e.target.value })} aria-label="List name" />
-              <Places value={jump} onPick={jumpTo} />
-              {isCalgary(jump) && <Segmented label="Jump to part of Calgary" className="area-seg" value={jump as Area} options={QUADRANTS.map((a) => ({ value: a.key, label: a.short }))} onChange={jumpTo} />}
+              <CitySelect cities={cities} value={jump.city || view?.key || ''} onPick={jumpCity} label="Jump to a city" />
+              {(jump.city || view?.key) === 'calgary' && <Segmented label="Jump to part of Calgary" className="area-seg" value={jump.quad as Area} options={QUADRANTS.map((a) => ({ value: a.key, label: a.short }))} onChange={jumpQuad} />}
               <p className="pick-hint">Tap cameras on the map to add them. Tap again to take one off.</p>
             </div>
             <ol className="pick-list" aria-label="Cameras in this list">
@@ -180,16 +197,16 @@ export function AreaShow({ open, onClose, cameras, roads, area, setArea, lists, 
           <aside className="bil-rail">
             <div className="bil-head">
               <p className="eyebrow">{list ? 'My list' : 'Areas'}</p>
-              <h2>{list ? list.name : info.label}</h2>
-              <Places value={list ? '' : area} onPick={(a) => { setArea(a); setListId(null) }} />
-              {!list && isCalgary(area) && <Segmented label="Part of Calgary" className="area-seg" value={area} onChange={setArea} options={QUADRANTS.map((a) => ({ value: a.key, label: a.short }))} />}
+              <h2>{list ? list.name : title}</h2>
+              {cities.length > 0 && <CitySelect cities={cities} value={list ? '' : view?.key ?? ''} onPick={(k) => { setViewKey(k); setListId(null) }} label="City" />}
+              {!list && isCgy && <Segmented label="Part of Calgary" className="area-seg" value={area} onChange={setArea} options={QUADRANTS.map((a) => ({ value: a.key, label: a.short }))} />}
               <div className="area-lists" role="group" aria-label="My lists">
-                {lists.map((l) => (
+                {shownLists.map((l) => (
                   <button key={l.id} className="lchip has-rpl" aria-pressed={l.id === listId} onClick={() => setListId(l.id)}>
                     <span>{l.name}</span><span className="lchip-n tnum">{l.ids.length}</span>
                   </button>
                 ))}
-                <button className="lchip lchip-add has-rpl" onClick={() => startEdit()}><Icon name="plus" size={14} /><span>{lists.length ? 'New list' : 'Make your own list'}</span></button>
+                <button className="lchip lchip-add has-rpl" onClick={() => startEdit()}><Icon name="plus" size={14} /><span>{shownLists.length ? 'New list' : 'Make your own list'}</span></button>
               </div>
               {list ? (
                 <div className="list-tools">
@@ -198,7 +215,7 @@ export function AreaShow({ open, onClose, cameras, roads, area, setArea, lists, 
                   <button className="btn-ghost btn-sm" onClick={() => removeList(list)}><Icon name="x" size={14} /> Delete</button>
                 </div>
               ) : (
-                <p className="area-note">{cams.length} of {inArea.length} cameras, picked to spread across {isCalgary(area) ? 'the area' : 'the region'}</p>
+                <p className="area-note">{cams.length} of {inArea.length} cameras, picked to spread across {isCgy ? 'this part of Calgary' : view?.name}</p>
               )}
             </div>
             {mini && (
@@ -226,7 +243,7 @@ export function AreaShow({ open, onClose, cameras, roads, area, setArea, lists, 
                   <span className="bil-n tnum">{j + 1}<small>/{cams.length}</small></span>
                   <div>
                     <h3>{c.name}</h3>
-                    <p>{list ? areaLabel(c) : info.label} · <Freshness id={c.id} /></p>
+                    <p>{areaLabel(c)} · <Freshness id={c.id} /></p>
                     <RoadNote road={roadAt(c, roads)} className="bil-road" />
                   </div>
                 </div>

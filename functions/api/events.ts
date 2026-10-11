@@ -1,4 +1,5 @@
 import { ab511, cached, getJSON, inBox, UA, type Env } from '../../shared/edge'
+import { ontarioEvents } from '../../shared/ontario'
 
 // Everything that can slow a drive: City of Calgary incidents and construction detours, and Alberta 511
 // incidents, closures and construction in the region. Cached for two minutes at the edge.
@@ -53,8 +54,9 @@ async function official(env: Env) {
 
 export const onRequestGet: PagesFunction<Env> = (ctx) =>
   cached(ctx, 120, async () => {
-    const events: RoadEvent[] = []
     const now = new Date()
+    if (new URL(ctx.request.url).searchParams.get('prov') === 'on') return { updated: now.toISOString(), alerts: [], ...(await ontarioEvents()) }
+    const events: RoadEvent[] = []
     // Detour times are local Calgary time without an offset; compare as local wall-clock strings.
     const local = new Date(now.toLocaleString('en-US', { timeZone: 'America/Edmonton' }))
     const pad = (n: number) => String(n).padStart(2, '0')

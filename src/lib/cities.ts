@@ -1,9 +1,14 @@
 import type { Camera } from './types'
 
-// Alberta cities and towns, with how far out (km) a camera still counts as theirs. Only the ones with at least
-// one camera are offered; the counts come from the live camera list.
-export type City = { key: string; name: string; lat: number; lon: number; km: number }
-export const CITIES: City[] = ([
+// Cities and towns, with how far out (km) a camera still counts as theirs. Only the ones with at least one camera
+// are offered; the counts come from the live camera list. Each province's cameras are loaded separately.
+export type Province = 'ab' | 'on'
+export const PROVINCES: { key: Province; label: string; short: string }[] = [
+  { key: 'ab', label: 'Alberta', short: 'Alberta' },
+  { key: 'on', label: 'Greater Toronto Area', short: 'Greater Toronto' },
+]
+export type City = { key: string; name: string; lat: number; lon: number; km: number; prov: Province }
+const ALBERTA = ([
   ['Calgary', 51.045, -114.07, 20], ['Edmonton', 53.546, -113.49, 20], ['Airdrie', 51.29, -114.01, 7], ['Cochrane', 51.19, -114.47, 7],
   ['Chestermere', 51.05, -113.82, 5], ['Okotoks', 50.725, -113.975, 7], ['Strathmore', 51.04, -113.4, 7], ['High River', 50.58, -113.87, 7],
   ['Canmore', 51.09, -115.35, 7], ['Banff', 51.178, -115.57, 6], ['Lake Louise', 51.43, -116.18, 10], ['Red Deer', 52.27, -113.81, 12],
@@ -20,19 +25,41 @@ export const CITIES: City[] = ([
   ['Hanna', 51.64, -111.93, 10], ['Ponoka', 52.68, -113.58, 8], ['Innisfail', 52.03, -113.95, 8], ['Didsbury', 51.66, -114.13, 6],
   ['Vegreville', 53.49, -112.05, 8], ['Vermilion', 53.35, -110.85, 8], ['Rocky Mountain House', 52.37, -114.92, 10], ['Westlock', 54.15, -113.86, 8],
   ['Barrhead', 54.12, -114.4, 8], ['St. Paul', 53.99, -111.29, 8],
-] as const).map(([name, lat, lon, km]) => ({ key: name.toLowerCase().replace(/[^a-z]+/g, '-'), name, lat, lon, km }))
+] as const)
+const GTA = ([
+  ['Toronto', 43.70, -79.40, 20], ['Mississauga', 43.59, -79.64, 12], ['Brampton', 43.73, -79.76, 10], ['Vaughan', 43.84, -79.51, 9],
+  ['Markham', 43.88, -79.26, 9], ['Richmond Hill', 43.88, -79.44, 6], ['Oakville', 43.45, -79.69, 9], ['Burlington', 43.33, -79.80, 8],
+  ['Hamilton', 43.24, -79.86, 14], ['Milton', 43.52, -79.88, 8], ['Oshawa', 43.90, -78.86, 8], ['Whitby', 43.88, -78.94, 6],
+  ['Ajax', 43.85, -79.03, 5], ['Pickering', 43.84, -79.09, 6], ['Newmarket', 44.05, -79.46, 6], ['Aurora', 44.0, -79.45, 4],
+  ['Clarington', 43.92, -78.69, 10], ['Caledon', 43.86, -79.86, 12], ['Halton Hills', 43.63, -79.95, 8], ['Whitchurch-Stouffville', 43.97, -79.25, 6],
+  ['King', 43.93, -79.53, 8], ['East Gwillimbury', 44.1, -79.44, 6], ['Georgina', 44.29, -79.43, 10], ['Grimsby', 43.19, -79.56, 8],
+] as const)
+const make = (prov: Province) => ([name, lat, lon, km]: readonly [string, number, number, number]): City =>
+  ({ key: name.toLowerCase().replace(/[^a-z]+/g, '-'), name, lat, lon, km, prov })
+export const CITIES: City[] = [...ALBERTA.map(make('ab')), ...GTA.map(make('on'))]
 
 const dist = (c: City, p: { lat: number; lon: number }) =>
   Math.hypot((p.lat - c.lat) * 111.2, (p.lon - c.lon) * 111.2 * Math.cos((c.lat * Math.PI) / 180))
 
-/** Each city with its camera count; a camera belongs to the nearest city whose radius it falls in. */
+/**
+ * The city a camera belongs to: the nearest one (relative to its size) whose radius it falls in. A camera's source
+ * settles the Toronto line, which a circle can't: City of Toronto cameras are Toronto's, York Region's never are.
+ */
+export function cityOf(p: { lat: number; lon: number; id?: string }): City | null {
+  if (p.id?.[0] === 't') return CITIES.find((c) => c.key === 'toronto')!
+  let best: City | null = null, bd = Infinity
+  for (const c of CITIES) {
+    if (p.id?.[0] === 'y' && c.key === 'toronto') continue
+    const d = dist(c, p) / c.km
+    if (d <= 1 && d < bd) { bd = d; best = c }
+  }
+  return best
+}
+
+/** Each city with its camera count. */
 export function citiesWithCameras(cams: Camera[]) {
   const n = new Map<string, number>()
-  for (const cam of cams) {
-    let best: City | null = null, bd = Infinity
-    for (const c of CITIES) { const d = dist(c, cam); if (d <= c.km && d / c.km < bd) { bd = d / c.km; best = c } }
-    if (best) n.set(best.key, (n.get(best.key) ?? 0) + 1)
-  }
+  for (const cam of cams) { const c = cityOf(cam); if (c) n.set(c.key, (n.get(c.key) ?? 0) + 1) }
   return CITIES.filter((c) => n.has(c.key)).map((c) => ({ ...c, cams: n.get(c.key)! })).sort((a, b) => a.name.localeCompare(b.name))
 }
 

@@ -10,6 +10,9 @@ import { LiveVideo } from './LiveVideo'
 
 export const STALE_MS = 15 * 60e3
 
+/** What a camera with no 511 road report says; Alberta covers its highways, so there it means a city street. */
+export const NO_REPORT = { text: 'City street · no 511 road report' }
+
 /** Cross-fades to each new picture so a refresh never flashes empty. */
 export function Shot({ id, alt, className }: { id: string; alt: string; className?: string }) {
   if (isLive(id)) return <LiveVideo id={id} alt={alt} className={className} />
@@ -73,7 +76,7 @@ function Age({ id }: { id: string }) {
 
 // The 511 road report for the stretch a camera shows, or a note that city streets aren't covered.
 export function RoadNote({ road, className = '' }: { road: RoadCondition | null | undefined; className?: string }) {
-  if (!road) return <p className={`road-note is-none ${className}`}><Icon name="road" size={14} /><span>City street · no 511 road report</span></p>
+  if (!road) return <p className={`road-note is-none ${className}`}><Icon name="road" size={14} /><span>{NO_REPORT.text}</span></p>
   const extra = [...road.extra, ...(road.visibility && !/good|normal/i.test(road.visibility) ? [`${road.visibility} visibility`] : [])]
   return (
     <p className={`road-note ${className}`} style={{ color: GRADE_COLOR[roadGrade(road)] }} title={`511 Alberta · ${road.hwy} ${road.segment} · updated ${road.updated}`}>

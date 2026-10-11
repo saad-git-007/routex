@@ -13,9 +13,9 @@ import { AnimatePresence } from 'motion/react'
 import type { Camera, Community, OnRoute, OptimizeBy, Place, RoadEvent, Route, TripShape, Weather } from './lib/types'
 import { AlertsPanel } from './components/AlertsPanel'
 import { AreaShow } from './components/AreaShow'
-import { areaOf, type Area } from './lib/areas'
+import { QUADRANTS, type Area } from './lib/areas'
 import { BeforeILeave } from './components/BeforeILeave'
-import { STALE_MS } from './components/CameraCard'
+import { NO_REPORT, STALE_MS } from './components/CameraCard'
 import { CamSheet } from './components/CamSheet'
 import { MapLayers } from './components/MapLayers'
 import { SavedRoutes, TripActions } from './components/TripActions'
@@ -25,7 +25,7 @@ import { CameraList } from './components/CameraList'
 import { Icon } from './components/Icon'
 import { MapView, type Basemap } from './components/MapView'
 import { CityPicker } from './components/CityPicker'
-import { CITIES, cityZoom, type City } from './lib/cities'
+import { CITIES, PROVINCES, cityZoom, type City, type Province } from './lib/cities'
 import { Planner } from './components/Planner'
 import { Segmented } from './components/Segmented'
 import { Timelapse } from './components/Timelapse'
@@ -55,11 +55,12 @@ const CAM_RADIUS = 250
 export default function App() {
   const [home, setHome] = useStored<Place | null>('home', null)
   const [stops, setStops] = useStored<Place[]>('stops', [])
-  if (home) setSearchNear(home.lat, home.lon)
   const [saved, setSaved] = useStored<Place[]>('saved', [])
   const [shape, setShape] = useStored<TripShape>('shape', 'round')
     const [tab, setTab] = useStored<Tab>('tab', 'cameras')
-  const [area, setArea] = useStored<Area>('area', 'ne')
+  const [storedArea, setArea] = useStored<Area>('area', 'ne')
+  // Older versions stored Alberta regions here; anything that isn't a part of Calgary falls back to Northeast.
+  const area: Area = QUADRANTS.some((q) => q.key === storedArea) ? storedArea : 'ne'
   const [camLists, setCamLists] = useStored<CamList[]>('camLists', [])
   const [listId, setListId] = useStored<string | null>('camList', null)
   // Stops are always ordered for the shortest total distance.
@@ -97,18 +98,18 @@ export default function App() {
   const [cityKey, setCityKey] = useStored<string | null>('city', null)
   const [cityOpen, setCityOpen] = useState(cityKey == null)
   const city = CITIES.find((c) => c.key === cityKey)
-  if (!home && city) setSearchNear(city.lat, city.lon)
+  const prov: Province = city?.prov ?? 'ab'
+  NO_REPORT.text = prov === 'ab' ? 'City street · no 511 road report' : 'No road condition report here'
+  if (home) setSearchNear(home.lat, home.lon, prov)
+  else if (city) setSearchNear(city.lat, city.lon, prov)
   const pickCity = (c: City) => {
     setCityKey(c.key); setCityOpen(false)
     setFlyTo({ lat: c.lat, lon: c.lon, zoom: cityZoom(c), n: Date.now() })
-    // Areas follows: a region of Alberta, or keep the chosen part of Calgary.
-    const a = areaOf({ lat: c.lat, lon: c.lon, name: '', src: 'ab', area: '', id: '' })
-    if (c.key !== 'calgary') setArea(a)
-    else if (!['nw', 'ne', 'centre', 'sw', 'se'].includes(area)) setArea('ne')
   }
   const [selEvent, setSelEvent] = useState<string | null>(null)
 
-  useEffect(() => { fetchCameras().then(setCameras).catch(() => {}) }, [])
+  // Each province's cameras load on their own; switching province swaps the whole set.
+  useEffect(() => { setCameras([]); fetchCameras(prov).then(setCameras).catch(() => {}) }, [prov])
   // A shared trip link (#trip=…) loads that trip, then the hash is cleared.
   useEffect(() => {
     const t = readTripLink()
@@ -119,8 +120,8 @@ export default function App() {
   const loadRoute = (r: SavedRoute) => {
     setHome(r.home); setStops(() => r.stops.map((p) => ({ ...p, id: crypto.randomUUID() }))); setShape(r.shape)
   }
-  const evData = usePoll(fetchEvents, 120_000)
-  const roadData = usePoll(fetchRoads, 600_000)
+  const evData = usePoll(() => fetchEvents(prov), 120_000, [prov])
+  const roadData = usePoll(() => fetchRoads(prov), 600_000, [prov])
   const roads = roadData?.roads ?? []
   const events = evData?.events ?? []
   const alerts = evData?.alerts ?? []
@@ -293,7 +294,7 @@ export default function App() {
             onCam={onCam} onEvent={onEvent}
             onAddStop={(p) => setStops((s) => [...s, p])} onSetHome={setHome} flyTo={flyTo}
           />
-          <MapLayers vis={vis} setVis={setVis} counts={layerCounts} hasTrip={hasTrip} grades={[...shownRoads, ...(vis.allRoads ? roads : [])].map(roadGrade)}
+          <MapLayers vis={vis} setVis={setVis} counts={layerCounts} hasTrip={hasTrip} prov={prov} grades={[...shownRoads, ...(vis.allRoads ? roads : [])].map(roadGrade)}
             basemap={basemap} setBasemap={setBasemap} names={names} setNames={setNames} namesCount={communities?.length} />
           <div className="map-tools">
             {full && hasTrip && (
@@ -355,7 +356,7 @@ export default function App() {
                 <li><b>2</b>Add destinations</li>
                 <li><b>3</b>Scroll the cameras</li>
               </ol>
-              <p className="empty-foot mono"><NumberTicker value={cameras.length} /> cameras live across Alberta</p>
+              <p className="empty-foot mono"><NumberTicker value={cameras.length} /> cameras live across {PROVINCES.find((p) => p.key === prov)!.label}</p>
             </section>
           ) : (
             <>
@@ -394,9 +395,9 @@ export default function App() {
 
       <Timelapse cam={lapse} onClose={() => setLapse(null)} />
       <ZoomView cam={zoom} onClose={() => setZoom(null)} />
-      <CityPicker open={cityOpen} first={cityKey == null} cameras={cameras} current={cityKey} onPick={pickCity}
+      <CityPicker open={cityOpen} first={cityKey == null} cameras={cameras} prov={prov} current={cityKey} onPick={pickCity}
         onClose={() => { setCityOpen(false); if (cityKey == null) setCityKey('calgary') }} />
-      <AreaShow open={areasOpen} onClose={() => setAreasOpen(false)} cameras={cameras} roads={roads} area={area} setArea={setArea}
+      <AreaShow open={areasOpen} onClose={() => setAreasOpen(false)} cameras={cameras} roads={roads} cityKey={cityKey} area={area} setArea={setArea}
         lists={camLists} setLists={setCamLists} listId={listId} setListId={setListId} onZoom={setZoom} />
       {route && <BeforeILeave open={leaving} onClose={() => setLeaving(false)} route={route} cams={routeCams} events={routeEvents as OnRoute<RoadEvent>[]} camRoads={camRoads} weather={weather} level={level} reasons={reasons} onZoom={setZoom} />}
     </div>

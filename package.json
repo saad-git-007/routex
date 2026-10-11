@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "wrangler pages dev dist",
-    "deploy": "npm run build && wrangler pages deploy dist --project-name routex-yyc --branch main"
+    "deploy": "npm run build && wrangler pages deploy dist --project-name routex-ca --branch main"
   },
   "dependencies": {
     "hls.js": "1.5.20",

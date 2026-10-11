@@ -1,8 +1,8 @@
 # RouteX
 
-**See the road before you drive it.** RouteX puts every live traffic camera, incident, closure and highway condition on your drive in Calgary and across Alberta in one place, in driving order.
+**See the road before you drive it.** RouteX puts every live traffic camera, incident, closure and highway condition on your drive in one place: across Alberta and the Greater Toronto Area so far, in driving order.
 
-**Live:** https://routex-yyc.pages.dev
+**Live:** https://routex-ca.pages.dev
 
 ![RouteX: a route across Calgary with live traffic cameras along it](public/og.png)
 
@@ -15,7 +15,8 @@
 - **Conditions along the route.** A strip showing each highway stretch's condition by kilometre, plus colour bands on the map.
 - **Weather.** Forecast at home, each stop and along the way (Open-Meteo), plus 511 road weather stations.
 - **Before I leave.** A full-screen, auto-advancing look at every camera on the route, one per screen.
-- **Areas.** Five cameras spread evenly across a part of Calgary (NW, NE, Core, SW, SE) or a region of Alberta (around Calgary, Edmonton, Bow Valley, central, south, north), for a quick overview without a route.
+- **Pick your city.** First-time visitors choose a city (Alberta or the Greater Toronto Area) from a searchable list or a drop-down; the map, search and data follow it.
+- **Areas.** Five cameras spread evenly across your city (or one part of Calgary: NW, NE, Core, SW, SE), for a quick overview without a route.
 - **Your own camera lists.** Pick cameras on a map, name the list, and play it back like an area. Lists stay in your browser.
 - **Take it with you.** Save and favourite routes in the browser, open the whole trip in Google Maps with stops in order, download GPX, or share a link that rebuilds the trip.
 - **Map.** Satellite or street basemap, Calgary community names, your live location, a Layers legend that doubles as filters, full screen, a swipe-up camera panel and pinch-to-zoom on pictures.
@@ -39,6 +40,7 @@ The Pages Functions fetch and normalise the public feeds behind Cloudflare's edg
 - **511 Alberta API:** cameras, events, winter road conditions, road weather stations and alerts, province-wide
 - **City of Edmonton:** live HLS traffic video, listed by [edmontontrafficcam.com](https://edmontontrafficcam.com)
 - **Town of Banff:** street camera pictures from [banff.ca](https://banff.ca/1065/Traffic-Cameras), placed on the map by hand
+- **Greater Toronto Area:** [Ontario 511](https://511on.ca) highway cameras and events, [City of Toronto Open Data](https://open.toronto.ca/dataset/traffic-cameras/) cameras and road restrictions (Open Government Licence – Toronto), and [York Region](https://www.york.ca/transportation/roads/traffic-cameras) cameras
 - **Open-Meteo:** weather forecast
 - **OSRM:** driving routes and the distance table
 - **Esri:** basemap imagery and geocoding
@@ -67,7 +69,7 @@ RouteX is set in the Timeless type family (Timeless Grotesk, Timeless Sans and T
 ## Deploy
 
 ```bash
-npx wrangler pages secret put AB511_KEY --project-name routex-yyc
+npx wrangler pages secret put AB511_KEY --project-name routex-ca
 npm run deploy
 ```
 
@@ -83,4 +85,4 @@ scripts/         Font build script
 
 ## Credits
 
-Traffic camera images, video and data © City of Calgary, City of Edmonton, Town of Banff and 511 Alberta (Government of Alberta), used under their open data terms. Weather by Open-Meteo. Routing by OSRM and OpenStreetMap contributors. Imagery © Esri, Maxar, Earthstar Geographics.
+Traffic camera images, video and data © City of Calgary, City of Edmonton, Town of Banff, 511 Alberta (Government of Alberta), Ontario 511 (Ministry of Transportation Ontario), City of Toronto and York Region, used under their open data terms. Weather by Open-Meteo. Routing by OSRM and OpenStreetMap contributors. Imagery © Esri, Maxar, Earthstar Geographics.

@@ -1,3 +1,4 @@
+import type { Province } from './cities'
 import { cumulative } from './geo'
 import type { Alert, Camera, Community, Place, RoadCondition, RoadEvent, OptimizeBy, Route, Station, TripShape, Weather } from './types'
 
@@ -7,22 +8,27 @@ async function get<T>(url: string, signal?: AbortSignal): Promise<T> {
   if (!r.ok) throw new Error(`${r.status} ${url}`)
   return r.json() as Promise<T>
 }
-export const fetchCameras = () => get<{ cameras: Camera[] }>('/api/cameras?ab=all&town=2').then((r) => r.cameras)
-export const fetchEvents = () => get<{ events: RoadEvent[]; alerts: Alert[]; updated: string }>('/api/events?ab=all')
+// Alberta keeps its original addresses (so cached copies stay valid); other provinces add ?prov=.
+const q = (prov: Province, ab: string) => (prov === 'ab' ? ab : `prov=${prov}`)
+export const fetchCameras = (prov: Province = 'ab') => get<{ cameras: Camera[] }>(`/api/cameras?${q(prov, 'ab=all&town=2')}`).then((r) => r.cameras)
+export const fetchEvents = (prov: Province = 'ab') => get<{ events: RoadEvent[]; alerts: Alert[]; updated: string }>(`/api/events?${q(prov, 'ab=all')}`)
 export const fetchCommunities = () => get<{ communities: Community[] }>('/api/communities').then((r) => r.communities)
-export const fetchRoads = () => get<{ roads: RoadCondition[]; stations: Station[] }>('/api/roads?ab=all')
+export const fetchRoads = (prov: Province = 'ab') => get<{ roads: RoadCondition[]; stations: Station[] }>(`/api/roads?${q(prov, 'ab=all')}`)
 
 // ── Esri World Geocoder (keyless suggest + find) ───────────────────────────────
 const GEO = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer'
-// Anywhere in Alberta, ranked nearest to home first (Calgary until a home is set).
-const EXTENT = JSON.stringify({ xmin: -120.1, ymin: 48.95, xmax: -109.9, ymax: 60.05, spatialReference: { wkid: 4326 } })
-let near = '-114.07,51.045'
-export const setSearchNear = (lat: number, lon: number) => { near = `${lon.toFixed(4)},${lat.toFixed(4)}` }
+// Anywhere in the chosen province, ranked nearest to home (or the chosen city) first.
+const EXTENTS: Record<Province, object> = {
+  ab: { xmin: -120.1, ymin: 48.95, xmax: -109.9, ymax: 60.05 },
+  on: { xmin: -80.6, ymin: 42.8, xmax: -78.2, ymax: 44.6 },
+}
+let near = '-114.07,51.045', extent: Province = 'ab'
+export const setSearchNear = (lat: number, lon: number, prov: Province = 'ab') => { near = `${lon.toFixed(4)},${lat.toFixed(4)}`; extent = prov }
 export type Suggestion = { text: string; magicKey: string }
 
 export async function suggest(text: string, signal?: AbortSignal): Promise<Suggestion[]> {
   const q = new URLSearchParams({
-    f: 'json', text, location: near, searchExtent: EXTENT, countryCode: 'CAN', maxSuggestions: '6',
+    f: 'json', text, location: near, searchExtent: JSON.stringify({ ...EXTENTS[extent], spatialReference: { wkid: 4326 } }), countryCode: 'CAN', maxSuggestions: '6',
     category: 'Address,POI,Postal,Neighborhood,Street Name',
   })
   const r = await get<{ suggestions?: Suggestion[] }>(`${GEO}/suggest?${q}`, signal)

@@ -63,8 +63,9 @@ export default function App() {
   const area: Area = QUADRANTS.some((q) => q.key === storedArea) ? storedArea : 'ne'
   const [camLists, setCamLists] = useStored<CamList[]>('camLists', [])
   const [listId, setListId] = useStored<string | null>('camList', null)
-  // Stops are always ordered for the shortest total distance.
+  // Stops go in the order they were added, or in the shortest order (the user's choice); shortest means distance.
   const by: OptimizeBy = 'distance'
+  const [keepOrder, setKeepOrder] = useStored<boolean>('keepOrder', true)
   const [layerPrefs, setLayerPrefs] = useStored<Partial<Record<LayerKey, boolean>>>('layers', {})
   const vis = { ...DEFAULT_LAYERS, ...layerPrefs }
   const setVis = (k: LayerKey, on: boolean) => setLayerPrefs((v) => ({ ...v, [k]: on }))
@@ -135,18 +136,18 @@ export default function App() {
     const ctl = new AbortController()
     setRouting(true); setRouteError('')
     const t = setTimeout(() => {
-      planRoute(home, stops, shape, by, ctl.signal)
+      planRoute(home, stops, shape, by, keepOrder, ctl.signal)
         .then((r) => { setRoute(r); setActive(null) })
         .catch((e) => { if (!ctl.signal.aborted) setRouteError(e.message === 'No route' ? 'No drivable route between these places' : 'Routing is busy, trying again shortly') })
         .finally(() => !ctl.signal.aborted && setRouting(false))
     }, 250)
     return () => { clearTimeout(t); ctl.abort() }
-  }, [home?.id, home?.lat, stopKey, shape, by]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [home?.id, home?.lat, stopKey, shape, by, keepOrder]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Retry a failed route once after a few seconds (the public OSRM server rate-limits bursts).
   useEffect(() => {
     if (!routeError || !home || !stops.length) return
-    const t = setTimeout(() => planRoute(home, stops, shape, by).then((r) => { setRoute(r); setRouteError('') }).catch(() => {}), 4000)
+    const t = setTimeout(() => planRoute(home, stops, shape, by, keepOrder).then((r) => { setRoute(r); setRouteError('') }).catch(() => {}), 4000)
     return () => clearTimeout(t)
   }, [routeError]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -345,7 +346,7 @@ export default function App() {
         <aside className="panel">
           <Planner
             home={home} setHome={setHome} stops={stops} setStops={setStops} saved={saved} setSaved={setSaved}
-            shape={shape} setShape={setShape} route={route} routing={routing} error={routeError}
+            shape={shape} setShape={setShape} keepOrder={keepOrder} setKeepOrder={setKeepOrder} route={route} routing={routing} error={routeError}
             onFocus={(p) => setFlyTo({ lat: p.lat, lon: p.lon, zoom: 16, n: Date.now() })}
           />
 

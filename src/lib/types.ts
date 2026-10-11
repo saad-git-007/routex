@@ -21,7 +21,7 @@ export type Route = {
   duration: number; distance: number
   highways: string[]         // "Hwy 201", "Hwy 2", ...
   // How the stop order was chosen: cost (metres or seconds) of the best order vs the order the stops were added.
-  opt: { by: OptimizeBy; best: number; entered: number; exact: boolean; reordered: boolean } | null
+  opt: { by: OptimizeBy; best: number; entered: number; exact: boolean; reordered: boolean; kept: boolean } | null
 }
 export type OnRoute<T> = T & { along: number; off: number; leg: number }
 

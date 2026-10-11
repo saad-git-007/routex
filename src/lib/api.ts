@@ -99,7 +99,7 @@ export function bestOrder(d: number[][], shape: TripShape): number[] {
 const hwy = (ref: string) =>
   ref.split(/[;,]/).map((r) => r.trim().replace(/^(AB|Hwy|HWY|TCH)\s*/i, '')).filter((r) => /^\d{1,3}[A-Z]?$/i.test(r)).map((r) => `Hwy ${r.toUpperCase()}`)
 
-export async function planRoute(home: Place, stops: Place[], shape: TripShape, by: OptimizeBy = 'distance', signal?: AbortSignal): Promise<Route> {
+export async function planRoute(home: Place, stops: Place[], shape: TripShape, by: OptimizeBy = 'distance', keep = false, signal?: AbortSignal): Promise<Route> {
   let ordered = stops
   let opt: Route['opt'] = null
   if (stops.length > 1) {
@@ -108,8 +108,9 @@ export async function planRoute(home: Place, stops: Place[], shape: TripShape, b
     const m = (by === 'distance' ? t.distances : t.durations).map((row) => row.map((x) => (x == null ? 1e9 : x)))
     const best = bestOrder(m, shape)
     const entered = stops.map((_, i) => i + 1)
-    ordered = best.map((i) => stops[i - 1])
-    opt = { by, best: tourCost(m, best, shape), entered: tourCost(m, entered, shape), exact: stops.length <= 8, reordered: best.some((v, i) => v !== i + 1) }
+    // Either the order the stops were added in, or the shortest one; both costs are kept so the planner can compare.
+    if (!keep) ordered = best.map((i) => stops[i - 1])
+    opt = { by, best: tourCost(m, best, shape), entered: tourCost(m, entered, shape), exact: stops.length <= 8, reordered: best.some((v, i) => v !== i + 1), kept: keep }
   }
   const order = shape === 'round' ? [home, ...ordered, home] : [home, ...ordered]
   type OsrmRoute = { duration: number; distance: number; geometry: { coordinates: [number, number][] }; legs: { duration: number; distance: number; steps: { ref?: string }[] }[] }

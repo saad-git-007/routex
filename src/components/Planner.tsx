@@ -12,6 +12,7 @@ type Props = {
   stops: Place[]; setStops: (f: (s: Place[]) => Place[]) => void
   saved: Place[]; setSaved: (f: (s: Place[]) => Place[]) => void
   shape: TripShape; setShape: (s: TripShape) => void
+  keepOrder: boolean; setKeepOrder: (k: boolean) => void
   route: Route | null; routing: boolean; error: string
   onFocus: (p: Place) => void
 }
@@ -21,7 +22,7 @@ const near = (a: Place, b: Place) => Math.abs(a.lat - b.lat) < 1e-4 && Math.abs(
 const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 const cost = (by: OptimizeBy, v: number) => (by === 'distance' ? km(v) : `${Math.max(1, Math.round(v / 60))} min`)
 
-export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape, setShape, route, routing, error, onFocus }: Props) {
+export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape, setShape, keepOrder, setKeepOrder, route, routing, error, onFocus }: Props) {
   const [editHome, setEditHome] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
   // Show stops in the order they'll be driven once a route exists.
@@ -58,15 +59,21 @@ export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape
       {home && (
         <>
           {stops.length > 1 && (
-            <div className={`opt-note ${routing ? 'is-busy' : ''}`} aria-live="polite">
-              <Icon name={routing ? 'route' : 'check'} size={15} />
-              <p>
-                {routing ? <span className="shiny">Finding the best order for {stops.length} stops…</span>
-                  : opt ? (opt.reordered && opt.entered - opt.best > (opt.by === 'distance' ? 50 : 30)
-                    ? <>Reordered for the {opt.by === 'distance' ? 'shortest drive' : 'quickest drive'}, saves <b>{cost(opt.by, opt.entered - opt.best)}</b> vs. the order you added them</>
-                    : <>Already in the {opt.by === 'distance' ? 'shortest' : 'quickest'} order</>)
-                  : <>Working out the order…</>}
-              </p>
+            <div className="opt-choice">
+              <Segmented
+                label="Stop order" value={keepOrder ? 'mine' : 'best'} onChange={(v) => setKeepOrder(v === 'mine')}
+                options={[{ value: 'mine', label: 'My order' }, { value: 'best', label: 'Shortest route' }]}
+              />
+              <div className={`opt-note ${routing ? 'is-busy' : ''}`} aria-live="polite">
+                <Icon name={routing ? 'route' : 'check'} size={15} />
+                <p>
+                  {routing ? <span className="shiny">{keepOrder ? 'Routing your stops in the order you added them…' : `Finding the shortest order for ${stops.length} stops…`}</span>
+                    : !opt ? <>Working out the route…</>
+                    : !(opt.reordered && opt.entered - opt.best > 50) ? <>Your order is already the shortest</>
+                    : opt.kept ? <>In the order you added them. The shortest route would save <b>{cost(opt.by, opt.entered - opt.best)}</b></>
+                    : <>Reordered for the shortest drive, saves <b>{cost(opt.by, opt.entered - opt.best)}</b> vs. your order</>}
+                </p>
+              </div>
             </div>
           )}
           <ol className="stops" aria-label="Stops in driving order">

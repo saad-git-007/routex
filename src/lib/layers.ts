@@ -13,6 +13,12 @@ export const LAYERS: { key: LayerKey; label: string; group: 'Cameras' | 'On the 
   { key: 'allRoads', label: 'All highway conditions', group: 'On the road' },
 ]
 
+/** The 511-type cameras' chip, named after who runs them in each province. */
+const PROV_CAMS: Record<string, string> = { ab: '511 Alberta cameras', bc: 'DriveBC cameras', sk: 'Highway Hotline cameras', mb: 'Manitoba 511 cameras', on: 'Ontario 511 cameras', atl: 'Provincial 511 cameras', yt: 'Yukon 511 cameras' }
+export const layerLabel = (key: LayerKey, prov: string) => (key === 'ab' ? PROV_CAMS[prov] ?? '511 cameras' : LAYERS.find((l) => l.key === key)!.label)
+/** Provinces with no road-condition feed (BC publishes none we can read). */
+export const NO_ROADS = new Set(['bc'])
+
 export const DEFAULT_LAYERS: Record<LayerKey, boolean> = { city: true, ab: true, town: true, others: true, incident: true, closure: true, construction: true, roads: true, allRoads: false }
 
 /** Who runs a camera, from its id's first letter. */

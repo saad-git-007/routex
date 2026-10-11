@@ -184,13 +184,13 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 
 /* ── Stats ── */
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); overflow: hidden; }
-.stat { container-type: inline-size; display: grid; gap: 6px; padding: 14px 12px 12px; }
+.stat { container-type: inline-size; display: grid; gap: 5px; padding: 11px 10px 9px; }
 .stat + .stat { border-left: 1px solid var(--line-subtle); }
 /* Numbers scale with their cell so each one fills its quarter of the card. */
-.stat strong { font: 500 min(50cqi, 3.4rem)/.95 var(--font-display); letter-spacing: -.03em; white-space: nowrap; }
+.stat strong { font: 500 min(37.5cqi, 2.55rem)/.95 var(--font-display); letter-spacing: -.03em; white-space: nowrap; }
 .stat:first-child strong { color: var(--accent); }
 .stat.is-alert strong { color: var(--review); }
-.stat > span { font-size: .7rem; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); }
+.stat > span { font-size: .56rem; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); }
 
 /* ── Empty state ── */
 .empty { overflow: hidden; padding: 40px 28px 30px; }
@@ -218,10 +218,10 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .cam-hit:active:not(:disabled) { scale: 1; }
 .cam-index { position: absolute; top: 10px; left: 10px; display: grid; place-items: center; min-width: 30px; height: 30px; padding: 0 8px; border-radius: var(--r-full); background: rgba(4,6,11,.78); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-line); font: 600 .8rem/1 var(--font-mono); }
 .cam-card.is-active .cam-index { background: var(--accent); color: var(--on-accent); }
-.cam-body { display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 16px; }
+.cam-body { display: flex; align-items: flex-start; gap: 10px; padding: 12px 12px 12px 16px; }
 .cam-title { flex: 1; min-width: 0; }
-.cam-title h3 { font-size: .95rem; font-weight: 600; letter-spacing: -.005em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cam-meta { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: .78rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; }
+.cam-title h3 { font-size: .95rem; font-weight: 600; line-height: 1.3; letter-spacing: -.005em; overflow-wrap: anywhere; text-wrap: pretty; }
+.cam-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin-top: 2px; font-size: .78rem; color: var(--text-muted); }
 
 .shot { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #000; }
 .shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -316,9 +316,11 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .pop .leaflet-popup-content-wrapper { background: var(--surface-2); color: var(--text); border-radius: var(--r-md); box-shadow: var(--elev-3); }
 .pop .leaflet-popup-tip { background: var(--surface-2); }
 .pop .leaflet-popup-content { margin: 12px 14px; }
-.pop-add { display: grid; gap: 4px; min-width: 180px; }
+.pop-add { position: relative; display: grid; gap: 4px; min-width: 180px; }
+.pop-add .mono, .pop-add b { padding-right: 30px; }
+.pop-x { position: absolute; top: -6px; right: -8px; }
 .pop-add b { font-weight: 600; font-size: .88rem; }
-.pop-add button { margin-top: 6px; }
+.pop-add .pop-go { margin-top: 6px; }
 
 
 /* ── Dialogs ── */
@@ -408,9 +410,9 @@ dialog::backdrop { background: rgba(0,0,0,.72); }
   .planner-opts .seg { width: 100%; }
   .planner-opts .seg button { flex: 1; }
   .tabs button { padding: 0 8px; gap: 5px; }
-  .stat { padding: 12px 6px 10px; justify-items: center; }
-  .stat strong { font-size: 50cqi; }
-  .stat > span { font-size: .62rem; letter-spacing: .08em; }
+  .stat { padding: 9px 6px 8px; justify-items: center; }
+  .stat strong { font-size: 37.5cqi; }
+  .stat > span { font-size: .5rem; letter-spacing: .08em; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -465,7 +467,9 @@ html.is-map-full, html.is-map-full body { overflow: hidden; }
 .layers .cond-legend { width: 100%; margin: 2px 2px 0; display: grid; gap: 3px; font-size: .7rem; }
 .layers-reset { justify-self: start; }
 .map-tools { position: absolute; z-index: 700; top: 12px; right: 12px; display: flex; align-items: center; gap: 8px; }
-.map-btn { width: 40px; min-height: 40px; padding: 0; border-radius: var(--r-md); border-color: var(--line); background-color: rgba(8,11,18,.9); color: var(--text); box-shadow: var(--elev-2); }
+.map-stack { display: grid; gap: 8px; }
+.map-stack:empty { display: none; }
+.map-btn { width: 36px; min-height: 36px; padding: 0; border-radius: var(--r-md); border-color: var(--line); background-color: rgba(8,11,18,.9); color: var(--text); box-shadow: var(--elev-2); }
 .map-btn:hover:not(:disabled) { background-color: var(--surface-3); }
 .map-btn[aria-pressed=true] { color: var(--accent); }
 .full-stats { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 6px 0 14px; border-radius: var(--r-full); background: rgba(8,11,18,.9); box-shadow: var(--elev-2); font-size: .85rem; color: var(--text-2); white-space: nowrap; }
@@ -479,7 +483,7 @@ html.is-map-full, html.is-map-full body { overflow: hidden; }
 .camsheet-head { display: flex; align-items: center; gap: 8px; padding: 0 8px 10px 12px; min-width: 0; }
 .camsheet-head .cam-index { position: static; flex: none; }
 .camsheet-title { flex: 1; min-width: 0; display: grid; }
-.camsheet-title b { font-size: .92rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.camsheet-title b { font-size: .92rem; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
 .camsheet-title span { font-size: .76rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .camsheet-pic { position: relative; }
 .camsheet-shot { aspect-ratio: 4 / 3; max-height: 34vh; }
@@ -494,15 +498,21 @@ html.is-map-full, html.is-map-full body { overflow: hidden; }
 /* Phones: map tools and the camera sheet (after the base rules so they win). */
 @media (max-width: 900px) {
   .layers { top: 10px; left: 10px; max-width: calc(100% - 72px); }
-  .layers.is-open { max-height: calc(100% - 20px); overflow-y: auto; }
+  .layers.is-open { max-height: calc(100% - 20px); overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+  .layers { max-width: calc(100% - 66px); }
+  .layers .lchip { max-width: 100%; min-width: 0; }
+  .layers .lchip > span:not(.lchip-n) { overflow: hidden; text-overflow: ellipsis; }
+  .layers .basemap-seg { width: 100%; }
+  .layers .basemap-seg button { flex: 1; }
   .map-tools { top: 10px; right: 10px; }
   .map-col.is-full .layers { top: calc(10px + env(safe-area-inset-top)); }
   .map-col.is-full .map-tools { top: calc(10px + env(safe-area-inset-top)); flex-direction: column-reverse; align-items: flex-end; }
+  .map-col.is-full .leaflet-bottom { bottom: env(safe-area-inset-bottom); }
   .camsheet, .camsheet.is-big { position: fixed; left: 0; right: 0; bottom: 0; width: 100%; border-radius: 18px 18px 0 0; z-index: 1600; }
   .camsheet-shot { max-height: 30vh; }
   .camsheet.is-big .camsheet-shot { max-height: 62vh; }
   .camsheet-shot, .camsheet.is-big .camsheet-shot { width: 100%; }
-  .map-col:has(.camsheet) .leaflet-control-zoom { display: none; }
+  .map-col:has(.camsheet) .leaflet-control-zoom, .map-col:has(.camsheet) .map-stack { display: none; }
 }
 
 /* ── Motion pass: ripple, live cues, reveals, glass on the map (ported techniques credited in place) ── */
@@ -585,13 +595,14 @@ html.is-map-full, html.is-map-full body { overflow: hidden; }
 }
 
 /* ── Trip actions and saved routes ── */
-.trip-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.trip-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; gap: 8px; }
+.trip-actions .btn-sm, .trip-actions .btn-link { min-width: 0; }
 .trip-actions .btn-sm { gap: 6px; border-color: var(--line); background-color: var(--surface-1); }
 .trip-actions .btn-sm.is-on { color: var(--accent); border-color: var(--accent-line); background-color: var(--accent-soft); }
 .btn-link { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-md); background-color: var(--surface-1); color: var(--text); font-size: .8125rem; font-weight: 550; text-decoration: none; white-space: nowrap; transition: background-color var(--t-hover), scale 220ms var(--spring-sm); }
 .btn-link:hover { background-color: var(--surface-3); }
 .btn-link:active { scale: .96; transition-duration: 80ms; }
-.trip-note { flex-basis: 100%; min-height: 0; font-size: .76rem; color: var(--accent); }
+.trip-note { grid-column: 1 / -1; min-height: 0; font-size: .76rem; color: var(--accent); }
 .trip-note:empty { display: none; }
 .saved-routes { padding: 12px 10px 8px 14px; display: grid; gap: 4px; }
 .saved-routes ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
@@ -629,7 +640,7 @@ html.is-map-full, html.is-map-full body { overflow: hidden; }
 .zoomview[open] { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
 .zv-head { display: flex; align-items: center; gap: 4px; padding: calc(8px + env(safe-area-inset-top)) 8px 8px 16px; background: var(--page); box-shadow: 0 1px 0 var(--line-subtle); }
 .zv-title { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
-.zv-title b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.zv-title b { overflow-wrap: anywhere; line-height: 1.3; font-weight: 600; }
 .zv-title .fresh { position: static; flex: none; background: var(--surface-3); }
 .zv-stage { position: relative; overflow: hidden; touch-action: none; cursor: zoom-in; }
 .zv-stage[data-zoomed=true] { cursor: grab; }
@@ -654,11 +665,10 @@ html.is-map-full, html.is-map-full body { overflow: hidden; }
 
 /* Phones: trip actions as one even row. */
 @media (max-width: 420px) {
-  .trip-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
-  .trip-actions .btn-sm, .trip-actions .btn-link { min-width: 0; padding: 0 4px; gap: 5px; font-size: .76rem; }
-  .ta-more { display: none; }
-  .trip-note { grid-column: 1 / -1; }
+  .trip-actions { gap: 6px; }
+  .trip-actions .btn-sm, .trip-actions .btn-link { padding: 0 4px; gap: 5px; font-size: .76rem; }
 }
+@media (max-width: 360px) { .ta-more { display: none; } }
 
 /* ── Areas: header button and full-screen view (reuses the Before I leave layout) ── */
 .btn-areas { min-height: 40px; padding: 0 14px; gap: 7px; border-color: var(--line); background-color: var(--surface-1); color: var(--text-2); }

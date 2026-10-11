@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { gpx, googleMapsUrl, routeName, tripLink, type SavedRoute } from '../lib/trip'
+import { useState, type MouseEvent } from 'react'
+import { appleMapsUrl, googleMapsAppUrl, googleMapsUrl, isApple, routeName, tripLink, type SavedRoute } from '../lib/trip'
 import type { OptimizeBy, Place, Route, TripShape } from '../lib/types'
 import { Icon } from './Icon'
 
@@ -20,10 +20,15 @@ export function TripActions({ route, home, stops, shape, by, routes, setRoutes }
     setRoutes((rs) => [{ id: crypto.randomUUID(), name, home, stops, shape, by, fav: false, saved: Date.now() }, ...rs])
     flash('Saved in this browser')
   }
-  const download = () => {
-    const blob = new Blob([gpx(route, name)], { type: 'application/gpx+xml' })
-    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `${name.replace(/[^\w→ -]+/g, '').replace(/\s*→\s*/g, '-').replace(/\s+/g, '_').slice(0, 60) || 'route'}.gpx` })
-    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  // On iPhone, try the Google Maps app; if it isn't installed the page never hides, so Apple Maps opens instead.
+  const openMaps = (e: MouseEvent) => {
+    if (!isApple()) return
+    e.preventDefault()
+    let left = false
+    const hide = () => { left = true }
+    document.addEventListener('visibilitychange', hide, { once: true })
+    window.location.href = googleMapsAppUrl(route)
+    setTimeout(() => { document.removeEventListener('visibilitychange', hide); if (!left && !document.hidden) window.location.href = appleMapsUrl(route) }, 1200)
   }
   const share = async () => {
     const url = tripLink(home, stops, shape, by)
@@ -36,10 +41,9 @@ export function TripActions({ route, home, stops, shape, by, routes, setRoutes }
       <button className={`btn-sm ${mine ? 'is-on' : ''}`} aria-pressed={!!mine} onClick={save} title={mine ? 'Remove from saved routes' : 'Save this route in this browser'}>
         <Icon name="bookmark" size={15} fill={!!mine} /> {mine ? 'Saved' : <>Save<span className="ta-more"> route</span></>}
       </button>
-      <a className="btn-sm btn-link" href={gm.url} target="_blank" rel="noopener" title={gm.dropped ? `Google Maps takes 9 stops in between; the last ${gm.dropped} are left out` : 'Open the whole route, in this order, in Google Maps'}>
+      <a className="btn-sm btn-link" href={gm.url} target="_blank" rel="noopener" onClick={openMaps} title={gm.dropped ? `Google Maps takes 9 stops in between; the last ${gm.dropped} are left out` : 'Open the whole route, in this order, in Google Maps (Apple Maps on iPhone without Google Maps)'}>
         <Icon name="external" size={15} /> <span><span className="ta-more">Google </span>Maps</span>
       </a>
-      <button className="btn-sm" onClick={download} title="Download as GPX for navigation apps"><Icon name="download" size={15} /> GPX</button>
       <button className="btn-sm" onClick={share} title="Copy a link that opens this trip"><Icon name="share" size={15} /> Share</button>
       <span className="trip-note" role="status">{note}</span>
     </div>

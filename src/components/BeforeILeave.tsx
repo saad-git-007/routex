@@ -72,7 +72,7 @@ export function BeforeILeave({ open, onClose, route, cams, events, camRoads, wea
         <>
           <aside className="bil-rail">
             <div className="bil-head">
-              <p className="eyebrow">Before I leave</p>
+              <p className="eyebrow">Cameras on your route</p>
               <h2><span className="tnum">{mins(route.duration)}</span> <em>· {km(route.distance)}</em></h2>
               <p className={`level level-${level}`}><i />{LEVEL_TEXT[level]}{reasons.length ? <span> · {reasons.slice(0, 3).join(' · ')}</span> : null}</p>
               {weather.length > 0 && (

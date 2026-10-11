@@ -99,6 +99,8 @@ export default function App() {
   const [cityKey, setCityKey] = useStored<string | null>('city', null)
   const [cityOpen, setCityOpen] = useState(cityKey == null)
   const city = CITIES.find((c) => c.key === cityKey)
+  // Calgary's community names only make sense for Calgary and the towns around it.
+  const nearCalgary = !!city && Math.hypot(city.lat - 51.045, (city.lon + 114.07) * 0.63) < 0.6
   const prov: Province = city?.prov ?? 'ab'
   NO_REPORT.text = prov === 'ab' ? 'City street · no 511 road report' : 'No road condition report here'
   if (home) setSearchNear(home.lat, home.lon, prov)
@@ -294,8 +296,8 @@ export default function App() {
           <button className="btn-areas has-rpl" onPointerDown={ripple} onClick={() => setAreasOpen(true)} aria-label="Areas: five cameras spread across a part of the city" title="Areas">
             <Icon name="camera" size={16} /><span>Areas</span>
           </button>
-          <button className="btn-accent btn-leave has-rpl" onPointerDown={ripple} disabled={!routeCams.length} onClick={() => setLeaving(true)} aria-label="Before I leave: every camera on the route, full screen">
-            <Icon name="play" size={14} fill /> <span>Before I leave</span>
+          <button className="btn-accent btn-leave has-rpl" onPointerDown={ripple} disabled={!routeCams.length} onClick={() => setLeaving(true)} aria-label="See cameras on your route, full screen">
+            <Icon name="play" size={14} fill /> <span>See cameras on your route</span>
           </button>
         </div>
       </header>
@@ -304,25 +306,27 @@ export default function App() {
         <div className={`map-col ${full ? 'is-full' : ''}`} ref={mapCol}>
           <MapView
             cameras={mapCameras} routeCams={routeCams} route={route} events={mapEvents} routeEventIds={routeEventIds} routeRoads={shownRoads} allRoads={vis.allRoads ? allRoads : []} onView={setMapView}
-            basemap={basemap} communities={names ? communities ?? [] : []} me={fix}
+            basemap={basemap} communities={names && nearCalgary ? communities ?? [] : []} me={fix}
             home={home} start={city ? { lat: city.lat, lon: city.lon, zoom: cityZoom(city) } : null} activeCam={active} focusAlong={focusAlong}
             onCam={onCam} onEvent={onEvent}
             onAddStop={(p) => setStops((s) => [...s, p])} onSetHome={setHome} flyTo={flyTo}
+            controls={<>
+              <button className={`map-btn loc-btn ${locOn && !fix ? 'is-seeking' : ''}`} onClick={() => { setLocMsg(''); setLocOn(!locOn) }} aria-pressed={locOn}
+                aria-label={locOn ? 'Hide my location' : 'Show my location'} title={locOn ? (fix ? `Hide my location (±${Math.round(fix.acc)} m)` : 'Finding you…') : 'Show my location'}>
+                <Icon name="locate" size={18} />
+              </button>
+              <button className="map-btn" onClick={toggleFull} aria-pressed={full} aria-label={full ? 'Exit full screen' : 'Full-screen map'} title={full ? 'Exit full screen (Esc)' : 'Full-screen map'}>
+                <Icon name={full ? 'unfull' : 'full'} size={18} />
+              </button>
+            </>}
           />
           <MapLayers vis={vis} setVis={setVis} counts={layerCounts} hasTrip={hasTrip} prov={prov} grades={[...shownRoads, ...(vis.allRoads ? allRoads : [])].map(roadGrade)}
-            basemap={basemap} setBasemap={setBasemap} names={names} setNames={setNames} namesCount={communities?.length} />
+            basemap={basemap} setBasemap={setBasemap} names={names} setNames={setNames} namesCount={communities?.length} nearCalgary={nearCalgary} />
           <div className="map-tools">
             {full && hasTrip && (
               <span className="full-stats"><b className="tnum">{mins(route.duration)}</b> · <span className="tnum">{km(route.distance)}</span><span className={`level level-${level}`}><i />{LEVEL_TEXT[level]}</span></span>
             )}
             {locMsg && !fix && <span className="loc-msg" role="status">{locMsg}</span>}
-            <button className={`map-btn loc-btn ${locOn && !fix ? 'is-seeking' : ''}`} onClick={() => { setLocMsg(''); setLocOn(!locOn) }} aria-pressed={locOn}
-              aria-label={locOn ? 'Hide my location' : 'Show my location'} title={locOn ? (fix ? `Hide my location (±${Math.round(fix.acc)} m)` : 'Finding you…') : 'Show my location'}>
-              <Icon name="locate" size={18} />
-            </button>
-            <button className="map-btn" onClick={toggleFull} aria-pressed={full} aria-label={full ? 'Exit full screen' : 'Full-screen map'} title={full ? 'Exit full screen (Esc)' : 'Full-screen map'}>
-              <Icon name={full ? 'unfull' : 'full'} size={18} />
-            </button>
           </div>
           <AnimatePresence>{sheetCam && (
             <CamSheet

@@ -1,6 +1,7 @@
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { reverse } from '../lib/api'
 import { sliceTo, pointAt } from '../lib/geo'
 import type { Camera, Community, OnRoute, Place, RoadCondition, RoadEvent, Route } from '../lib/types'
@@ -39,6 +40,8 @@ type Props = {
   onCam: (id: string) => void; onEvent: (id: string) => void
   onAddStop: (p: Place) => void; onSetHome: (p: Place) => void
   flyTo: { lat: number; lon: number; zoom?: number; n: number } | null
+  /** Buttons stacked in the same column as the zoom buttons, above them. */
+  controls?: ReactNode
 }
 
 const EVENT_GLYPH: Record<RoadEvent['kind'], string> = { incident: '!', closure: '⨯', construction: '▲' }
@@ -49,6 +52,7 @@ export function MapView(p: Props) {
     !!q && (!p.start || Math.hypot(q.lat - p.start.lat, (q.lon - p.start.lon) * Math.cos((q.lat * Math.PI) / 180)) * 111 < 300)
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map>()
+  const [stackEl, setStackEl] = useState<HTMLElement | null>(null)
   const layers = useRef<Record<string, L.LayerGroup>>({})
   const camMarkers = useRef(new Map<string, L.Marker>())
   const progress = useRef<{ line: L.Polyline; glow: L.Polyline; car: L.Marker } | null>(null)
@@ -75,6 +79,9 @@ export function MapView(p: Props) {
   useEffect(() => {
     const m = L.map(el.current!, { zoomControl: false, preferCanvas: true, attributionControl: true, zoomSnap: 0.25, minZoom: 5 }).setView(nearStart(p.home) ? [p.home!.lat, p.home!.lon] : p.start ? [p.start.lat, p.start.lon] : CALGARY, nearStart(p.home) ? 12 : p.start?.zoom ?? 11)
     L.control.zoom({ position: 'bottomright' }).addTo(m)
+    const Stack = L.Control.extend({ onAdd: () => { const d = L.DomUtil.create('div', 'leaflet-control map-stack'); L.DomEvent.disableClickPropagation(d); return d } })
+    const stack = new Stack({ position: 'bottomright' }).addTo(m)
+    setStackEl(stack.getContainer()!)
     m.attributionControl.setPrefix(false)
     m.createPane('labels').style.zIndex = '405'
     m.createPane('route').style.zIndex = '410'
@@ -91,11 +98,12 @@ export function MapView(p: Props) {
       const { lat, lng } = e.latlng
       const div = document.createElement('div')
       div.className = 'pop-add'
-      div.innerHTML = `<span class="mono">Here</span><b>…</b><button class="btn-accent btn-sm"></button>`
-      const btn = div.querySelector('button')!
+      div.innerHTML = `<button class="btn-icon btn-xs pop-x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button><span class="mono">Here</span><b>…</b><button class="btn-accent btn-sm pop-go"></button>`
+      const btn = div.querySelector<HTMLButtonElement>('.pop-go')!
       const hasHome = !!cb.current.home
       btn.textContent = hasHome ? '＋ Add stop' : 'Set as home'
       const pop = L.popup({ className: 'pop', closeButton: false, offset: [0, -4] }).setLatLng(e.latlng).setContent(div).openOn(m)
+      div.querySelector<HTMLButtonElement>('.pop-x')!.onclick = () => m.closePopup(pop)
       const label = await reverse(lat, lng).catch(() => 'Dropped pin')
       div.querySelector('b')!.textContent = label
       btn.onclick = () => {
@@ -282,5 +290,5 @@ export function MapView(p: Props) {
     if (p.flyTo && map.current) map.current.flyTo([p.flyTo.lat, p.flyTo.lon], p.flyTo.zoom ?? Math.max(map.current.getZoom(), 15), { duration: 0.8 })
   }, [p.flyTo])
 
-  return <div ref={el} className="map" aria-label="Map" />
+  return <><div ref={el} className="map" aria-label="Map" />{stackEl && p.controls && createPortal(p.controls, stackEl)}</>
 }

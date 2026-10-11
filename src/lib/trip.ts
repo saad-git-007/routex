@@ -15,14 +15,18 @@ export function googleMapsUrl(route: Route, shape: TripShape) {
   return { url: `https://www.google.com/maps/dir/?${q}`, dropped: Math.max(0, waypoints.length - 9), shape }
 }
 
-const esc = (s: string) => s.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`)
-// GPX 1.1: the stops as waypoints plus the driven line as a track, for Garmin, OsmAnd, Organic Maps and others.
-export function gpx(route: Route, name: string) {
-  const step = Math.max(1, Math.floor(route.coords.length / 2000))
-  const trk = route.coords.filter((_, i) => i % step === 0 || i === route.coords.length - 1).map(([a, b]) => `<trkpt lat="${a.toFixed(6)}" lon="${b.toFixed(6)}"/>`).join('')
-  const wpts = route.order.map((p, i) => `<wpt lat="${p.lat.toFixed(6)}" lon="${p.lon.toFixed(6)}"><name>${i === 0 ? 'Home' : i === route.order.length - 1 && p.id === route.order[0].id ? 'Home' : `${i}. ${esc(short(p))}`}</name><desc>${esc(p.label)}</desc></wpt>`).join('')
-  return `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="RouteX" xmlns="http://www.topografix.com/GPX/1/1"><metadata><name>${esc(name)}</name></metadata>${wpts}<trk><name>${esc(name)}</name><trkseg>${trk}</trkseg></trk></gpx>`
+// Apple Maps links take a start and one destination, so the first leg of the trip is handed over (in driving order).
+export function appleMapsUrl(route: Route) {
+  const pts = route.order.map((p) => `${p.lat.toFixed(6)},${p.lon.toFixed(6)}`)
+  return `https://maps.apple.com/?${new URLSearchParams({ saddr: pts[0], daddr: pts[1] ?? pts[0], dirflg: 'd' })}`
 }
+/** The Google Maps app's own link (iOS), with stops chained as "+to:" destinations. */
+export function googleMapsAppUrl(route: Route) {
+  const pts = route.order.map((p) => `${p.lat.toFixed(6)},${p.lon.toFixed(6)}`)
+  return `comgooglemaps://?saddr=${pts[0]}&daddr=${pts.slice(1, 11).join('+to:')}&directionsmode=driving`
+}
+/** iPhone and iPad (iPadOS reports itself as a Mac with touch). */
+export const isApple = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
 
 // A shareable link to this app with the trip in the URL hash (nothing is sent to a server).
 type Packed = { h: [string, number, number]; s: [string, number, number][]; r: TripShape; b: OptimizeBy }

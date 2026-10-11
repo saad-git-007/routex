@@ -867,3 +867,6 @@ html.is-map-full, html.is-map-full body { overflow: hidden; }
 .lvl-item.kind-closure, .lvl-item.kind-incident, .lvl-item.is-high { border-left-color: var(--danger); }
 .lvl-item.kind-construction { border-left-color: var(--review); }
 .lvl-none { font-size: .82rem; color: var(--text-2); }
+
+/* Double tap opens a camera card full screen; stop the browser treating it as a page zoom. */
+.cam-hit { touch-action: manipulation; }

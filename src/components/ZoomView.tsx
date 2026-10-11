@@ -8,7 +8,7 @@ import { Icon } from './Icon'
 
 const MAX = 6
 
-// Full-screen picture with pinch, wheel and double-tap zoom, and drag to pan. Keeps updating with each new frame.
+// Full-screen picture with pinch and wheel zoom, and drag to pan; a double tap closes it. Keeps updating with each new frame.
 // The transform is written straight to the image so zooming never re-renders React.
 export function ZoomView({ cam, onClose }: { cam: Camera | null; onClose: () => void }) {
   const dlg = useRef<HTMLDialogElement>(null)
@@ -18,6 +18,8 @@ export function ZoomView({ cam, onClose }: { cam: Camera | null; onClose: () => 
   const ptrs = useRef(new Map<number, { x: number; y: number }>())
   const pinch = useRef<{ d: number; s: number } | null>(null)
   const lastTap = useRef(0)
+  // Set by the second tap of a double tap; the close happens on its click, so that click can't reach the page behind.
+  const closeTap = useRef<{ x: number; y: number } | null>(null)
   const f = useFrame(cam?.id ?? '')
 
   const apply = (animate = false) => {
@@ -68,7 +70,7 @@ export function ZoomView({ cam, onClose }: { cam: Camera | null; onClose: () => 
       pinch.current = { d: Math.hypot(a.x - b.x, a.y - b.y), s: t.current.s }
     } else if (e.pointerType !== 'mouse') {
       const now = Date.now()
-      if (now - lastTap.current < 280) { const [x, y] = local(e); zoomAt(t.current.s > 1.2 ? 1 : 2.5, x, y, true); lastTap.current = 0 } else lastTap.current = now
+      if (now - lastTap.current < 300) { lastTap.current = 0; closeTap.current = { x: e.clientX, y: e.clientY } } else lastTap.current = now
     }
   }
   const move = (e: React.PointerEvent) => {
@@ -102,6 +104,7 @@ export function ZoomView({ cam, onClose }: { cam: Camera | null; onClose: () => 
             <button className="btn-icon" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" /></button>
           </div>
           <div ref={stage} className="zv-stage" data-zoomed="false" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
+            onClick={(e) => { const c = closeTap.current; closeTap.current = null; if (c && Math.hypot(e.clientX - c.x, e.clientY - c.y) < 12) dlg.current?.close() }}
             onDoubleClick={(e) => { const [x, y] = local(e); zoomAt(t.current.s > 1.2 ? 1 : 2.5, x, y, true) }}>
             {isLive(cam.id) ? <LiveVideo id={cam.id} alt={`Live video from ${cam.name}`} className="zoom-live" videoRef={(el) => { img.current = el }} />
               : (isStill(cam.id) || f?.url) ? <img ref={(el) => { img.current = el }} src={isStill(cam.id) ? directUrl(cam.id, Math.floor(Date.now() / 60e3)) : f!.url} alt={`Latest picture from ${cam.name}`} draggable={false} /> : <div className="shot-loading" />}

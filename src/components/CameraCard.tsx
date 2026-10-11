@@ -89,10 +89,17 @@ export function CameraCard({ cam, index, legLabel, road, active, onSelect, onZoo
   cam: OnRoute<Camera>; index: number; legLabel: string; road: RoadCondition | null | undefined; active: boolean
   onSelect: () => void; onZoom: () => void; cardRef?: (el: HTMLElement | null) => void
 }) {
+  // A double tap on the picture opens it full screen (a single tap still shows the camera on the map).
+  const lastTap = useRef(0)
+  const tap = (e: React.PointerEvent) => {
+    if (e.pointerType === 'mouse') return
+    const now = Date.now()
+    if (now - lastTap.current < 300) { lastTap.current = 0; onZoom() } else lastTap.current = now
+  }
   return (
     <div className={`magic cam-card ${active ? 'is-active' : ''}`} data-cam={cam.id} ref={cardRef}>
       {active && <span className="card-trace" aria-hidden />}
-      <button className="cam-hit" onClick={onSelect} aria-label={`Show ${cam.name} on the map`}>
+      <button className="cam-hit" onClick={onSelect} onPointerUp={tap} onDoubleClick={onZoom} aria-label={`Show ${cam.name} on the map`}>
         <Shot id={cam.id} alt={`Latest picture from ${cam.name}`} />
         <span className="cam-index tnum">{index + 1}</span>
         <Freshness id={cam.id} />

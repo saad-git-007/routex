@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { QUADRANTS, areaOf, spread, type Area } from '../lib/areas'
 import { citiesWithCameras, cityOf, cityZoom } from '../lib/cities'
 import { sourceLabel } from '../lib/layers'
@@ -7,6 +7,7 @@ import { useFrames, useWatch } from '../lib/frames'
 import type { CamList } from '../lib/lists'
 import type { Camera, RoadCondition } from '../lib/types'
 import { Freshness, RoadNote, Shot } from './CameraCard'
+import { extent } from '../lib/geo'
 import { Icon } from './Icon'
 import { AddressSearch } from './AddressSearch'
 import { PickMap } from './PickMap'
@@ -34,7 +35,7 @@ function CitySelect({ cities, value, onPick, label }: { cities: CityRow[]; value
 
 // Full screen, like Before I leave: five cameras spread across a city (or one part of Calgary), one per screen,
 // or a list of cameras the viewer picked on a map and saved in this browser.
-export function AreaShow({ open, onClose, cameras, roads: abRoads, prov, cityKey, area, setArea, lists, setLists, listId, setListId, onZoom }: {
+function AreaShowView({ open, onClose, cameras, roads: abRoads, prov, cityKey, area, setArea, lists, setLists, listId, setListId, onZoom }: {
   open: boolean; onClose: () => void; cameras: Camera[]; roads: RoadCondition[]; prov: string
   cityKey: string | null; area: Area; setArea: (a: Area) => void
   lists: CamList[]; setLists: (f: (l: CamList[]) => CamList[]) => void; listId: string | null; setListId: (id: string | null) => void
@@ -58,9 +59,9 @@ export function AreaShow({ open, onClose, cameras, roads: abRoads, prov, cityKey
   const isCgy = view?.key === 'calgary'
   const inArea = useMemo(() => cameras.filter((c) => cityOf(c)?.key === view?.key && (!isCgy || areaOf(c) === area)), [cameras, view, isCgy, area])
   // Cameras whose picture failed are left out, so a dead feed gets replaced by its neighbour.
-  const offline = inArea.filter((c) => frames.get(c.id)?.error).map((c) => c.id).join()
+  const offline = inArea.filter((c) => frames.get(c.id)?.error).map((c) => c.id).join(',')
   const listCams = useMemo(() => (list ? list.ids.map((id) => byId.get(id)).filter((c): c is Camera => !!c) : []), [list, byId])
-  const areaCams = useMemo(() => spread(inArea.filter((c) => !offline.includes(c.id))), [inArea, offline])
+  const areaCams = useMemo(() => spread(inArea.filter((c) => !offline.split(',').includes(c.id))), [inArea, offline])
   const cams = list ? listCams : areaCams
   // Outside Alberta, road conditions load from the 511 map tiles around the cameras on show.
   const near = useWtaRoads(prov, open ? cams : NONE, null).near
@@ -135,10 +136,11 @@ export function AreaShow({ open, onClose, cameras, roads: abRoads, prov, cityKey
   const mini = useMemo(() => {
     if (!pool.length) return null
     const lats = pool.map((c) => c.lat), lons = pool.map((c) => c.lon)
-    const k = Math.cos((((Math.min(...lats) + Math.max(...lats)) / 2) * Math.PI) / 180)
-    const w = (Math.max(...lons) - Math.min(...lons)) * k || 1e-3, h = Math.max(...lats) - Math.min(...lats) || 1e-3
+    const [la0, la1] = extent(lats), [lo0, lo1] = extent(lons)
+    const k = Math.cos((((la0 + la1) / 2) * Math.PI) / 180)
+    const w = (lo1 - lo0) * k || 1e-3, h = la1 - la0 || 1e-3
     const s = 88 / Math.max(w, h)
-    const xy = (c: Camera) => [6 + (c.lon - Math.min(...lons)) * k * s, 6 + (Math.max(...lats) - c.lat) * s] as const
+    const xy = (c: Camera) => [6 + (c.lon - lo0) * k * s, 6 + (la1 - c.lat) * s] as const
     return { W: w * s + 12, H: h * s + 12, xy }
   }, [pool])
 
@@ -274,3 +276,5 @@ export function AreaShow({ open, onClose, cameras, roads: abRoads, prov, cityKey
     </dialog>
   )
 }
+
+export const AreaShow = memo(AreaShowView)

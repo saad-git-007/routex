@@ -86,16 +86,19 @@ function decode(b64: string) {
 async function poll(ids: string[]) {
   if (!ids.length) return
   emit({ busy: true })
-  const frames = new Map(snap.frames)
+  // Collect what changed and merge it into the latest snapshot at the end: a copy taken now would overwrite pictures
+  // that a quicker fetch (for newly watched cameras) publishes while this one is still waiting.
+  const frames = new Map<string, Frame>()
+  const cur = (id: string) => frames.get(id) ?? snap.frames.get(id)
   for (let i = 0; i < ids.length; i += BATCH) {
     const part = ids.slice(i, i + BATCH)
-    const q = part.map((id) => { const f = frames.get(id); return f && !f.error ? `${id}:${f.lm}` : id }).join(',')
+    const q = part.map((id) => { const f = cur(id); return f && !f.error ? `${id}:${f.lm}` : id }).join(',')
     try {
       const r = await fetch(`/api/frames?ids=${q}`)
       const j = (await r.json()) as { frames: { id: string; lm?: number; data?: string; error?: number }[] }
       const now = Date.now()
       for (const f of j.frames) {
-        const prev = frames.get(f.id)
+        const prev = cur(f.id)
         if (f.data && f.lm) {
           const blob = decode(f.data)
           if (prev) setTimeout(() => URL.revokeObjectURL(prev.url), 5000)
@@ -106,7 +109,9 @@ async function poll(ids: string[]) {
       }
     } catch { /* offline: keep what we have */ }
   }
-  emit({ frames, busy: false, lastAt: Date.now() })
+  const merged = new Map(snap.frames)
+  frames.forEach((v, k) => merged.set(k, v))
+  emit({ frames: merged, busy: false, lastAt: Date.now() })
 }
 
 function tick() {
@@ -143,11 +148,31 @@ export function watch(all: string[]) {
   ids.forEach((id) => watched.set(id, (watched.get(id) ?? 0) + 1))
   if (!timer) timer = window.setTimeout(tick, PERIOD)
   fetchNew()
-  return () => ids.forEach((id) => {
-    const n = (watched.get(id) ?? 1) - 1
-    if (n <= 0) watched.delete(id)
-    else watched.set(id, n)
-  })
+  return () => {
+    ids.forEach((id) => {
+      const n = (watched.get(id) ?? 1) - 1
+      if (n <= 0) watched.delete(id)
+      else watched.set(id, n)
+    })
+    scheduleSweep()
+  }
+}
+
+// Pictures of cameras nobody has looked at for two minutes are let go (each holds an image in memory); the last one
+// stays in IndexedDB, so coming back to them still paints at once.
+let sweep: number | undefined
+function scheduleSweep() {
+  clearTimeout(sweep)
+  sweep = window.setTimeout(() => {
+    let dropped = false
+    const frames = new Map(snap.frames)
+    for (const [id, f] of frames) {
+      if (watched.has(id)) continue
+      if (f.url) URL.revokeObjectURL(f.url)
+      frames.delete(id); dropped = true
+    }
+    if (dropped) emit({ frames })
+  }, 120_000)
 }
 
 export const refreshNow = () => tick()

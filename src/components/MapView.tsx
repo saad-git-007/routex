@@ -12,19 +12,20 @@ const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services'
 const CALGARY: L.LatLngTuple = [51.045, -114.07]
 export type Basemap = 'sat' | 'streets'
 
-// Each basemap: a coarse copy underneath (so loading tiles show blurred map, not a blank), the base, and overlays.
+// Each basemap: a coarse copy underneath (so loading tiles show blurred map, not a blank; only up to zoom 13, as
+// stretching it further cost a fifth of every pan frame), the base, and overlays.
 function basemapLayers(b: Basemap) {
   const common = { updateWhenZooming: false, keepBuffer: 4, maxZoom: 19 }
   if (b === 'streets') {
     const url = `${ESRI}/World_Street_Map/MapServer/tile/{z}/{y}/{x}`
     return [
-      L.tileLayer(url, { maxNativeZoom: 10, keepBuffer: 8, zIndex: 0, className: 'tiles-under' }),
+      L.tileLayer(url, { maxNativeZoom: 10, maxZoom: 13, keepBuffer: 4, zIndex: 0, className: 'tiles-under' }),
       L.tileLayer(url, { ...common, zIndex: 1, className: 'tiles-streets', attribution: 'Map © Esri, HERE, Garmin, OpenStreetMap contributors' }),
     ]
   }
   const url = `${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`
   return [
-    L.tileLayer(url, { maxNativeZoom: 10, keepBuffer: 8, zIndex: 0, className: 'tiles-under' }),
+    L.tileLayer(url, { maxNativeZoom: 10, maxZoom: 13, keepBuffer: 4, zIndex: 0, className: 'tiles-under' }),
     L.tileLayer(url, { ...common, zIndex: 1, className: 'tiles-imagery', attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }),
     L.tileLayer(`${ESRI}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`, { ...common, zIndex: 2, className: 'tiles-roads' }),
     L.tileLayer(`${ESRI}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, { ...common, zIndex: 3 }),
@@ -60,6 +61,14 @@ export function MapView(p: Props) {
   const progress = useRef<{ line: L.Polyline; glow: L.Polyline; car: L.Marker } | null>(null)
   const me = useRef<{ dot: L.Marker; acc: L.Circle } | null>(null)
   const cb = useRef(p)
+  // Canvases are made once and reused (a new L.canvas() per rebuild left old ones on the map, each redrawn on every
+  // move, and the top one swallowed taps meant for the camera dots under it). Everything you can tap or hover — quiet
+  // camera dots, highway conditions, route condition halos — shares the one overlay canvas so hits always land.
+  const canvases = useRef<Record<string, L.Canvas>>({})
+  const canvasFor = (k: string) => (canvases.current[k] ??= L.canvas({ padding: 0.15 }))
+  // The live location circle and the driven line change with every fix: SVG updates one shape, a canvas redraws all.
+  const liveSvg = useRef<L.SVG | null>(null)
+  const svgLive = () => (liveSvg.current ??= L.svg({ pane: 'driven', padding: 0.15 }))
   cb.current = p
 
   // Hide community names that would overlap a bigger community's name. Neighbourhoods come before
@@ -79,7 +88,7 @@ export function MapView(p: Props) {
 
   // ── init ──
   useEffect(() => {
-    const m = L.map(el.current!, { zoomControl: false, preferCanvas: true, attributionControl: true, zoomSnap: 0.25, minZoom: 5 }).setView(nearStart(p.home) ? [p.home!.lat, p.home!.lon] : p.start ? [p.start.lat, p.start.lon] : CALGARY, nearStart(p.home) ? 12 : p.start?.zoom ?? 11)
+    const m = L.map(el.current!, { zoomControl: false, preferCanvas: true, attributionControl: true, zoomSnap: 0.25, minZoom: 5, fadeAnimation: false }).setView(nearStart(p.home) ? [p.home!.lat, p.home!.lon] : p.start ? [p.start.lat, p.start.lon] : CALGARY, nearStart(p.home) ? 12 : p.start?.zoom ?? 11)
     L.control.zoom({ position: 'bottomright' }).addTo(m)
     const Stack = L.Control.extend({ onAdd: () => { const d = L.DomUtil.create('div', 'leaflet-control map-stack'); L.DomEvent.disableClickPropagation(d); return d } })
     const stack = new Stack({ position: 'bottomright' }).addTo(m)
@@ -137,7 +146,7 @@ export function MapView(p: Props) {
     const g = layers.current.communities
     g.clearLayers()
     if (!p.communities.length) return
-    const renderer = L.canvas({ padding: 0.3 })
+    const renderer = canvasFor('overlay')
     const color = p.basemap === 'streets' ? '#5b4bd6' : '#ffffff'
     for (const c of p.communities) {
       L.polygon(c.rings, { renderer, color, weight: 1.2, opacity: p.basemap === 'streets' ? 0.55 : 0.6, dashArray: '5 4', fill: false, interactive: false }).addTo(g)
@@ -150,7 +159,7 @@ export function MapView(p: Props) {
   useEffect(() => {
     const g = layers.current.all
     g.clearLayers()
-    const renderer = L.canvas({ padding: 0.3 })
+    const renderer = canvasFor('overlay')
     for (const c of p.cameras) {
       L.circleMarker([c.lat, c.lon], { renderer, radius: 4, weight: 1.5, color: 'rgba(0,0,0,.7)', fillColor: c.src === 'ab' ? '#ab9dff' : c.src === 'town' ? '#ffb86b' : '#e6eef8', fillOpacity: 0.9 })
         .bindTooltip(c.name, { direction: 'top', className: 'tip', offset: [0, -4] })
@@ -183,7 +192,7 @@ export function MapView(p: Props) {
     g.clearLayers()
     for (const r of p.routeRoads) {
       if (!r.line?.length) continue
-      L.polyline(r.line, { pane: 'route', color: GRADE_COLOR[roadGrade(r)], weight: 20, opacity: 0.75, lineCap: 'butt', lineJoin: 'round' })
+      L.polyline(r.line, { renderer: canvasFor('overlay'), color: GRADE_COLOR[roadGrade(r)], weight: 20, opacity: 0.75, lineCap: 'butt', lineJoin: 'round' })
         .bindTooltip([r.hwy, r.condition, ...r.extra].filter(Boolean).join(' · '), { className: 'tip', sticky: true })
         .addTo(g).bringToBack()
     }
@@ -193,7 +202,7 @@ export function MapView(p: Props) {
   useEffect(() => {
     const g = layers.current.allRoads
     g.clearLayers()
-    const renderer = L.canvas({ padding: 0.3 })
+    const renderer = canvasFor('overlay')
     for (const r of p.allRoads) {
       if (!r.line?.length) continue
       const grade = roadGrade(r)
@@ -277,7 +286,7 @@ export function MapView(p: Props) {
     const g = layers.current.driven
     if (!p.route || p.driven == null || p.driven < 20) { g.clearLayers(); drivenLine.current = null; return }
     const pts = sliceTo(p.route, p.driven)
-    if (!drivenLine.current) drivenLine.current = L.polyline(pts, { pane: 'driven', color: '#5b6577', weight: 7, opacity: 0.95, lineCap: 'round', interactive: false }).addTo(g)
+    if (!drivenLine.current) drivenLine.current = L.polyline(pts, { renderer: svgLive(), pane: 'driven', color: '#5b6577', weight: 7, opacity: 0.95, lineCap: 'round', interactive: false }).addTo(g)
     else drivenLine.current.setLatLngs(pts)
   }, [p.route, p.driven])
 
@@ -288,13 +297,19 @@ export function MapView(p: Props) {
     const at: L.LatLngTuple = [p.me.lat, p.me.lon]
     const moving = p.me.heading != null && !Number.isNaN(p.me.heading) && (p.me.speed ?? 0) > 1
     if (!me.current) {
-      const acc = L.circle(at, { radius: p.me.acc, pane: 'route', color: '#3b9bff', weight: 1, opacity: 0.5, fillColor: '#3b9bff', fillOpacity: 0.12, interactive: false }).addTo(m)
+      const acc = L.circle(at, { radius: p.me.acc, renderer: svgLive(), pane: 'driven', color: '#3b9bff', weight: 1, opacity: 0.5, fillColor: '#3b9bff', fillOpacity: 0.12, interactive: false }).addTo(m)
       const dot = L.marker(at, { pane: 'cams', interactive: false, keyboard: false, zIndexOffset: 1200, icon: L.divIcon({ className: 'mk-me', html: '<b></b><i></i><span></span>', iconSize: [22, 22] }) }).addTo(m)
       me.current = { dot, acc }
     }
     me.current.acc.setLatLng(at).setRadius(p.me.acc)
     me.current.dot.setLatLng(at)
-    if (p.follow) m.panTo(at, { animate: true, duration: 0.6 })
+    // Following: re-centre only when the dot nears the edge of the view. Each pan redraws every path on the map, so
+    // panning on every fix (once a second or more) kept the map busy.
+    if (p.follow && !m.getBounds().pad(-0.25).contains(at)) {
+      // A short hop glides; a long one (the phone was asleep, or a fix jumped) moves straight there.
+      const d = m.latLngToContainerPoint(at).distanceTo(m.getSize().divideBy(2)), far = d > Math.min(m.getSize().x, m.getSize().y) * 0.75
+      m.panTo(at, { animate: !far, duration: 0.3 })
+    }
     const node = me.current.dot.getElement()
     if (node) {
       node.classList.toggle('is-moving', moving)

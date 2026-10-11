@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { memo, useState, useMemo } from 'react'
 import { GRADE_COLOR, GRADES, roadGrade, roadIsGood } from '../lib/conditions'
-import { ago, km, kmIn, onRoute } from '../lib/geo'
+import { ago, km, kmIn, onRoute, extent } from '../lib/geo'
 import type { OnRoute, RoadCondition, RoadEvent, Route } from '../lib/types'
 import { useNow } from '../lib/useNow'
 import { useNewIds } from '../lib/useSeen'
@@ -29,19 +29,20 @@ function along(route: Route, roads: RoadCondition[]) {
     const hits = onRoute(route, r.line.map(([lat, lon]) => ({ lat, lon })), 120)
     if (!hits.length) return []
     const a = hits.map((h) => h.along)
-    return [{ r, from: Math.min(...a), to: Math.max(...a) }]
+    const [from, to] = extent(a)
+    return [{ r, from, to }]
   }).filter((x) => x.to - x.from > 200).sort((a, b) => a.from - b.from)
 }
 
-export function AlertsPanel({ events, roads, highways, route, onShow, onShowRoad, selected }: {
+function AlertsPanelView({ events, roads, highways, route, onShow, onShowRoad, selected }: {
   events: OnRoute<RoadEvent>[]; roads: RoadCondition[]; highways: string[]; route: Route
   onShow: (e: RoadEvent) => void; onShowRoad: (r: RoadCondition) => void; selected: string | null
 }) {
   const now = useNow(30000)
   const [open, setOpen] = useState<string | null>(null)
   const fresh = useNewIds(events.map((e) => e.id))
-  const sorted = [...events].sort((a, b) => RANK[a.kind] - RANK[b.kind] || a.along - b.along)
-  const segs = along(route, roads)
+  const sorted = useMemo(() => [...events].sort((a, b) => RANK[a.kind] - RANK[b.kind] || a.along - b.along), [events])
+  const segs = useMemo(() => along(route, roads), [route, roads])
   const byHwy = segs.length ? [] : highways.map((h) => ({ h, rows: roads.filter((r) => r.hwy.toUpperCase() === h.toUpperCase()) })).filter((x) => x.rows.length)
 
   return (
@@ -125,3 +126,5 @@ export function RoadLegend({ present }: { present: string[] }) {
     </ul>
   )
 }
+
+export const AlertsPanel = memo(AlertsPanelView)

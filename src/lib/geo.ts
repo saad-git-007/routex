@@ -14,16 +14,61 @@ export function cumulative(coords: [number, number][]) {
   return cum
 }
 
+// ── A grid over the route's segments (about 550 m cells), built once per route, so "how far is this point from the
+// route" only looks at the segments nearby instead of all of them. ──
+const CELL = 0.005
+type Grid = { kx: number; cells: Map<number, number[]>; all: number[] }
+const grids = new WeakMap<Route, Grid>()
+const cellKey = (y: number, x: number) => y * 100003 + x
+function gridOf(route: Route): Grid {
+  let g = grids.get(route)
+  if (g) return g
+  const { coords } = route
+  const kx = Math.cos((coords[0]?.[0] ?? 50) * K)
+  const cells = new Map<number, number[]>()
+  for (let i = 1; i < coords.length; i++) {
+    const [aLat, aLon] = coords[i - 1], [bLat, bLon] = coords[i]
+    const y0 = Math.floor(Math.min(aLat, bLat) / CELL), y1 = Math.floor(Math.max(aLat, bLat) / CELL)
+    const x0 = Math.floor((Math.min(aLon, bLon) * kx) / CELL), x1 = Math.floor((Math.max(aLon, bLon) * kx) / CELL)
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const k = cellKey(y, x), l = cells.get(k)
+      if (l) l.push(i); else cells.set(k, [i])
+    }
+  }
+  g = { kx, cells, all: coords.map((_, i) => i).slice(1) }
+  grids.set(route, g)
+  return g
+}
+/** Segment indices (ascending, i.e. in driving order) within about `radius` metres of a point. */
+function nearSegments(route: Route, lat: number, lon: number, radius: number) {
+  const g = gridOf(route)
+  const r = Math.ceil(radius / 550) + 1
+  const y = Math.floor(lat / CELL), x = Math.floor((lon * g.kx) / CELL)
+  const out = new Set<number>()
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const l = g.cells.get(cellKey(y + dy, x + dx))
+    if (l) for (const i of l) out.add(i)
+  }
+  return [...out].sort((a, b) => a - b)
+}
+
 /**
  * Where a point meets the route: distance off the line and metres along it. On a round trip a camera can be passed
- * twice; the first pass within `radius` wins so cards follow the order you drive them.
+ * twice; the first pass within `radius` wins so cards follow the order you drive them. With `far` off, points nowhere
+ * near the route come back as Infinity off (cheap); with it on, the true distance is worked out.
  */
-export function project(route: Route, lat: number, lon: number, radius: number) {
+export function project(route: Route, lat: number, lon: number, radius: number, far = true) {
+  const near = nearSegments(route, lat, lon, radius)
+  const hit = near.length ? scan(route, lat, lon, radius, near) : { off: Infinity, along: 0 }
+  if (hit.off <= radius || !far) return hit
+  return scan(route, lat, lon, radius, gridOf(route).all)
+}
+function scan(route: Route, lat: number, lon: number, radius: number, idx: number[]) {
   const { coords, cum } = route
   const cosLat = Math.cos(lat * K)
   let best = { off: Infinity, along: 0 }
   let first: { off: number; along: number } | null = null
-  for (let i = 1; i < coords.length; i++) {
+  for (const i of idx) {
     const [aLat, aLon] = coords[i - 1], [bLat, bLon] = coords[i]
     // Local equirectangular projection around the point, in metres.
     const ax = (aLon - lon) * K * cosLat * R, ay = (aLat - lat) * K * R
@@ -41,16 +86,24 @@ export function project(route: Route, lat: number, lon: number, radius: number) 
   return first ?? best
 }
 
+/** Min/max of a list without spreading it into arguments (long routes have more points than Safari allows as arguments). */
+export function extent(v: number[]) {
+  let lo = Infinity, hi = -Infinity
+  for (const x of v) { if (x < lo) lo = x; if (x > hi) hi = x }
+  return [lo, hi] as const
+}
+
 export function onRoute<T extends { lat: number; lon: number }>(route: Route, items: T[], radius: number): OnRoute<T>[] {
   const lats = route.coords.map((c) => c[0]), lons = route.coords.map((c) => c[1])
   const pad = radius / 111000 + 0.002
-  const s = Math.min(...lats) - pad, n = Math.max(...lats) + pad
+  const [latLo, latHi] = extent(lats), [lonLo, lonHi] = extent(lons)
+  const s = latLo - pad, n = latHi + pad
   const padLon = pad / Math.cos(((s + n) / 2) * K)
-  const w = Math.min(...lons) - padLon, e = Math.max(...lons) + padLon
+  const w = lonLo - padLon, e = lonHi + padLon
   const out: OnRoute<T>[] = []
   for (const it of items) {
     if (it.lat < s || it.lat > n || it.lon < w || it.lon > e) continue
-    const p = project(route, it.lat, it.lon, radius)
+    const p = project(route, it.lat, it.lon, radius, false)
     if (p.off > radius) continue
     let leg = 0
     while (leg + 1 < route.legStart.length && route.legStart[leg + 1] <= p.along) leg++
@@ -96,7 +149,7 @@ export function overlaps(route: Route, line: [number, number][], tol = 90) {
   if (line.length < 2) return false
   let hits = 0
   for (const [lat, lon] of line) {
-    if (project(route, lat, lon, tol).off <= tol && ++hits >= Math.max(3, Math.ceil(line.length * 0.2))) return true
+    if (project(route, lat, lon, tol, false).off <= tol && ++hits >= Math.max(3, Math.ceil(line.length * 0.2))) return true
   }
   return false
 }
@@ -139,6 +192,13 @@ export function track(route: Route, lat: number, lon: number, prev: number | nul
     if (off < best.off) best = { off, along: cum[i - 1] + t * (cum[i] - cum[i - 1]) }
   }
   if (best.off <= 150) return best
-  const again = project(route, lat, lon, 150)
-  return again.off < best.off ? again : best
+  // Lost the thread (no fixes for a while, or a jumpy one): of every pass near this spot, take the one closest to
+  // where we last were, so a round trip's drive home doesn't snap back to the drive out.
+  const g = gridOf(route), near = nearSegments(route, lat, lon, 150)
+  let pick: { off: number; along: number } | null = null
+  for (const i of near) {
+    const h = scan(route, lat, lon, 150, [i])
+    if (h.off <= 150 && (!pick || Math.abs(h.along - prev) < Math.abs(pick.along - prev))) pick = h
+  }
+  return pick ?? (best.off < Infinity ? best : scan(route, lat, lon, 150, g.all))
 }

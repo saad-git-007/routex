@@ -5,13 +5,17 @@ import type { Alert, Camera, Community, Place, RoadCondition, RoadEvent, Optimiz
 // ── Our edge endpoints ──────────────────────────────────────────────────────────
 async function get<T>(url: string, signal?: AbortSignal): Promise<T> {
   const r = await fetch(url, { signal })
+  // OSRM answers "no route between these points" with a 400 and a code in the body.
+  if (r.status === 400 && url.startsWith(OSRM)) { const j = await r.json().catch(() => null) as { code?: string } | null; if (j?.code && j.code !== 'Ok') throw new Error('No route') }
   if (!r.ok) throw new Error(`${r.status} ${url}`)
   return r.json() as Promise<T>
 }
 // Alberta keeps its original addresses (so cached copies stay valid); other provinces add ?prov=.
 const q = (prov: Province, ab: string) => (prov === 'ab' ? ab : `prov=${prov}`)
-export const fetchCameras = (prov: Province = 'ab') => get<{ cameras: Camera[] }>(`/api/cameras?${q(prov, 'ab=all&town=3')}`).then((r) => r.cameras)
-export const fetchEvents = (prov: Province = 'ab') => get<{ events: RoadEvent[]; alerts: Alert[]; updated: string }>(`/api/events?${q(prov, 'ab=all')}`)
+// A source can send a point with a missing coordinate; one of those reaching the map would take the whole page down.
+const placed = <T extends { lat: number; lon: number }>(xs: T[]) => xs.filter((x) => Number.isFinite(x.lat) && Number.isFinite(x.lon))
+export const fetchCameras = (prov: Province = 'ab') => get<{ cameras: Camera[] }>(`/api/cameras?${q(prov, 'ab=all&town=3')}`).then((r) => placed(r.cameras))
+export const fetchEvents = (prov: Province = 'ab') => get<{ events: RoadEvent[]; alerts: Alert[]; updated: string }>(`/api/events?${q(prov, 'ab=all')}`).then((r) => ({ ...r, events: placed(r.events) }))
 export const fetchCommunities = () => get<{ communities: Community[] }>('/api/communities').then((r) => r.communities)
 export const fetchRoads = (prov: Province = 'ab') => get<{ roads: RoadCondition[]; stations: Station[] }>(`/api/roads?${q(prov, 'ab=all')}`)
 

@@ -1,10 +1,11 @@
+import { memo } from 'react'
 import { sky, weatherFlags } from '../lib/conditions'
 import { km } from '../lib/geo'
 import type { OnRoute, Station, Weather } from '../lib/types'
 import { ago } from '../lib/geo'
 import { Icon } from './Icon'
 
-export function WeatherPanel({ weather, stations }: { weather: Weather[]; stations: OnRoute<Station>[] }) {
+function WeatherPanelView({ weather, stations }: { weather: Weather[]; stations: OnRoute<Station>[] }) {
   if (!weather.length) return <div className="quiet"><span className="spinner" /><p>Checking the weather along your route…</p></div>
   return (
     <>
@@ -51,3 +52,5 @@ export function WeatherPanel({ weather, stations }: { weather: Weather[]; statio
     </>
   )
 }
+
+export const WeatherPanel = memo(WeatherPanelView)

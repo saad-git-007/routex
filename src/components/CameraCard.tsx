@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { GRADE_COLOR, roadGrade } from '../lib/conditions'
 import { useFrame } from '../lib/frames'
 import { ago, kmIn } from '../lib/geo'
@@ -29,9 +29,9 @@ function DirectStill({ id, alt, className }: { id: string; alt: string; classNam
   return (
     <div className={`shot ${className ?? ''}`}>
       {!shown.length && (error ? <div className="shot-empty"><Icon name="camera" size={22} /><span>No picture</span></div> : <div className="shot-loading" />)}
-      {shown.map((u, i) => <img key={u} src={u} alt={i === shown.length - 1 ? alt : ''} className={i === shown.length - 1 && shown.length > 1 ? 'in' : ''} draggable={false} />)}
+      {shown.map((u, i) => <img key={u} src={u} alt={i === shown.length - 1 ? alt : ''} className={i === shown.length - 1 && shown.length > 1 ? 'in' : ''} draggable={false} decoding="async" />)}
       {shown[shown.length - 1] !== next && (
-        <img key={next} src={next} alt="" hidden onLoad={() => { setError(false); setShown((s) => [...s.slice(-1), next]) }} onError={() => setError(true)} />
+        <img key={next} src={next} alt="" hidden decoding="async" onLoad={() => { setError(false); setShown((s) => [...s.slice(-1), next]) }} onError={() => setError(true)} />
       )}
     </div>
   )
@@ -53,7 +53,7 @@ function Still({ id, alt, className }: { id: string; alt: string; className?: st
   return (
     <div className={`shot ${stale ? 'is-stale' : ''} ${className ?? ''}`}>
       {layers.length === 0 && (f?.error ? <div className="shot-empty"><Icon name="camera" size={22} /><span>No picture</span></div> : <div className="shot-loading" />)}
-      {layers.map((u, i) => <img key={u} src={u} alt={i === layers.length - 1 ? alt : ''} className={i === layers.length - 1 && layers.length > 1 ? 'in' : ''} draggable={false} />)}
+      {layers.map((u, i) => <img key={u} src={u} alt={i === layers.length - 1 ? alt : ''} className={i === layers.length - 1 && layers.length > 1 ? 'in' : ''} draggable={false} decoding="async" />)}
       {fresh > 0 && <span key={fresh} className="shot-sweep" aria-hidden />}
     </div>
   )
@@ -85,10 +85,13 @@ export function RoadNote({ road, className = '' }: { road: RoadCondition | null 
   )
 }
 
-export function CameraCard({ cam, index, legLabel, road, active, onSelect, onZoom, cardRef }: {
+// Memoised with id-based callbacks, so scrolling the list (which moves "active") re-renders two cards, not all of them.
+export const CameraCard = memo(function CameraCard({ cam, index, legLabel, road, active, onSelect: select, onZoom: zoom, cardRef: register }: {
   cam: OnRoute<Camera>; index: number; legLabel: string; road: RoadCondition | null | undefined; active: boolean
-  onSelect: () => void; onZoom: () => void; cardRef?: (el: HTMLElement | null) => void
+  onSelect: (id: string) => void; onZoom: (c: Camera) => void; cardRef?: (id: string, el: HTMLElement | null) => void
 }) {
+  const onSelect = () => select(cam.id), onZoom = () => zoom(cam)
+  const cardRef = register && ((el: HTMLElement | null) => register(cam.id, el))
   // A double tap on the picture opens it full screen (a single tap still shows the camera on the map).
   const lastTap = useRef(0)
   const tap = (e: React.PointerEvent) => {
@@ -114,4 +117,4 @@ export function CameraCard({ cam, index, legLabel, road, active, onSelect, onZoo
       </div>
     </div>
   )
-}
+})

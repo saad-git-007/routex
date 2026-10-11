@@ -71,7 +71,7 @@ export const onRequestGet: PagesFunction<Env> = (ctx) =>
     ])
     if (inc.status === 'fulfilled')
       inc.value.forEach((i, n) => events.push({
-        id: `ci${n}-${i.start_dt_utc}`, kind: 'incident', src: 'city', title: (i.incident_info ?? 'Incident').trim(), detail: (i.description ?? '').trim(),
+        id: `ci${i.id ?? `${n}-${i.start_dt_utc}`}`, kind: 'incident', src: 'city', title: (i.incident_info ?? 'Incident').trim(), detail: (i.description ?? '').trim(),
         lat: +i.latitude, lon: +i.longitude, start: i.start_dt_utc + 'Z', updated: i.modified_dt_utc + 'Z',
       }))
     if (det.status === 'fulfilled')

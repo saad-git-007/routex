@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { useFrame } from '../lib/frames'
 import { directUrl, isStill, isLive } from '../lib/live'
 import { LiveVideo } from './LiveVideo'
@@ -10,7 +10,7 @@ const MAX = 6
 
 // Full-screen picture with pinch and wheel zoom, and drag to pan; a double tap closes it. Keeps updating with each new frame.
 // The transform is written straight to the image so zooming never re-renders React.
-export function ZoomView({ cam, onClose }: { cam: Camera | null; onClose: () => void }) {
+function ZoomViewView({ cam, onClose }: { cam: Camera | null; onClose: () => void }) {
   const dlg = useRef<HTMLDialogElement>(null)
   const stage = useRef<HTMLDivElement>(null)
   const img = useRef<HTMLImageElement | HTMLVideoElement | null>(null)
@@ -117,3 +117,5 @@ export function ZoomView({ cam, onClose }: { cam: Camera | null; onClose: () => 
     </dialog>
   )
 }
+
+export const ZoomView = memo(ZoomViewView)

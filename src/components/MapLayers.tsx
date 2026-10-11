@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { LAYERS, NO_ROADS, layerLabel, type LayerKey } from '../lib/layers'
 import { ripple } from '../lib/ripple'
 import { useBump } from '../lib/useSeen'
@@ -9,7 +9,7 @@ import { Segmented } from './Segmented'
 import type { Province } from '../lib/cities'
 
 // The map legend doubles as the filter: each swatch is a switch for that layer.
-export function MapLayers({ vis, setVis, counts, hasTrip, grades, prov, basemap, setBasemap, names, setNames, namesCount, nearCalgary }: {
+function MapLayersView({ vis, setVis, counts, hasTrip, grades, prov, basemap, setBasemap, names, setNames, namesCount, nearCalgary }: {
   vis: Record<LayerKey, boolean>; setVis: (k: LayerKey, on: boolean) => void; counts: Partial<Record<LayerKey, number>>; hasTrip: boolean; grades: string[]; prov: Province
   basemap: Basemap; setBasemap: (b: Basemap) => void; names: boolean; setNames: (on: boolean) => void; namesCount?: number; nearCalgary: boolean
 }) {
@@ -60,3 +60,5 @@ export function MapLayers({ vis, setVis, counts, hasTrip, grades, prov, basemap,
     </div>
   )
 }
+
+export const MapLayers = memo(MapLayersView)

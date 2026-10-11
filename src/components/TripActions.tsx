@@ -1,10 +1,10 @@
-import { useState, type MouseEvent } from 'react'
+import { memo, useState, type MouseEvent } from 'react'
 import { appleMapsUrl, googleMapsAppUrl, googleMapsUrl, isApple, routeName, tripLink, type SavedRoute } from '../lib/trip'
 import type { OptimizeBy, Place, Route, TripShape } from '../lib/types'
 import { Icon } from './Icon'
 
 // Save, favourite, share and export the current trip.
-export function TripActions({ route, home, stops, shape, by, routes, setRoutes }: {
+function TripActionsView({ route, home, stops, shape, by, routes, setRoutes }: {
   route: Route; home: Place; stops: Place[]; shape: TripShape; by: OptimizeBy
   routes: SavedRoute[]; setRoutes: (f: (r: SavedRoute[]) => SavedRoute[]) => void
 }) {
@@ -51,7 +51,7 @@ export function TripActions({ route, home, stops, shape, by, routes, setRoutes }
 }
 
 // Saved routes, favourites first; tap to load.
-export function SavedRoutes({ routes, setRoutes, onLoad }: { routes: SavedRoute[]; setRoutes: (f: (r: SavedRoute[]) => SavedRoute[]) => void; onLoad: (r: SavedRoute) => void }) {
+function SavedRoutesView({ routes, setRoutes, onLoad }: { routes: SavedRoute[]; setRoutes: (f: (r: SavedRoute[]) => SavedRoute[]) => void; onLoad: (r: SavedRoute) => void }) {
   if (!routes.length) return null
   const list = [...routes].sort((a, b) => +b.fav - +a.fav || b.saved - a.saved)
   return (
@@ -74,3 +74,7 @@ export function SavedRoutes({ routes, setRoutes, onLoad }: { routes: SavedRoute[
     </section>
   )
 }
+
+export const TripActions = memo(TripActionsView)
+
+export const SavedRoutes = memo(SavedRoutesView)

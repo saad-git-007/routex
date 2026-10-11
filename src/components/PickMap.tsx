@@ -29,22 +29,36 @@ export function PickMap({ cameras, picked, focus, onPick, view, pin }: {
     return () => { ro.disconnect(); m.remove() }
   }, [])
 
+  // Markers are made once per set of cameras; a tap only restyles the cameras whose state changed (it used to rebuild
+  // every marker in the province, over a thousand in Ontario or BC, on each tap).
+  const markers = useRef(new Map<string, { mk: L.Marker; key: string }>())
+  const iconFor = (c: Camera, n: number | undefined, focused: boolean) => L.divIcon({
+    className: `mk-pick ${n ? 'is-picked' : ''} ${c.src === 'ab' ? 'is-ab' : c.src === 'town' ? 'is-town' : ''} ${focused ? 'is-focus' : ''}`,
+    html: n ? `<span>${n}</span>` : '<i></i>', iconSize: n ? [26, 26] : [22, 22],
+  })
   useEffect(() => {
     const g = layer.current!
-    g.clearLayers()
-    const order = new Map(picked.map((id, i) => [id, i + 1]))
+    g.clearLayers(); markers.current.clear()
     for (const c of cameras) {
-      const n = order.get(c.id)
-      const cls = `mk-pick ${n ? 'is-picked' : ''} ${c.src === 'ab' ? 'is-ab' : c.src === 'town' ? 'is-town' : ''} ${c.id === focus ? 'is-focus' : ''}`
-      L.marker([c.lat, c.lon], {
-        icon: L.divIcon({ className: cls, html: n ? `<span>${n}</span>` : '<i></i>', iconSize: n ? [26, 26] : [22, 22] }),
-        zIndexOffset: n ? 500 : 0, keyboard: false,
-      })
+      const mk = L.marker([c.lat, c.lon], { icon: iconFor(c, undefined, false), keyboard: false })
         .bindTooltip(c.name, { className: 'tip', direction: 'top', offset: [0, -12] })
         .on('click', () => cb.current(c.id))
         .addTo(g)
+      markers.current.set(c.id, { mk, key: '|0' })
     }
-  }, [cameras, picked, focus])
+  }, [cameras])
+  useEffect(() => {
+    const order = new Map(picked.map((id, i) => [id, i + 1]))
+    for (const c of cameras) {
+      const m = markers.current.get(c.id)
+      if (!m) continue
+      const n = order.get(c.id), focused = c.id === focus
+      const key = `${n ?? ''}|${focused ? 1 : 0}`
+      if (key === m.key) continue
+      m.key = key
+      m.mk.setIcon(iconFor(c, n, focused)).setZIndexOffset(n ? 500 : 0)
+    }
+  }, [cameras, picked, focus]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // The searched address, so the cameras around it are easy to see.
   useEffect(() => {

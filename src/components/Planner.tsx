@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, Reorder, useDragControls } from 'motion/react'
-import { useEffect, useState, type ReactNode } from 'react'
+import { memo, useEffect, useState, type ReactNode } from 'react'
 import { satThumb } from '../lib/api'
 import { km } from '../lib/geo'
 import type { Place, Route, TripShape } from '../lib/types'
@@ -21,7 +21,7 @@ const near = (a: Place, b: Place) => Math.abs(a.lat - b.lat) < 1e-4 && Math.abs(
 
 const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
-export function Planner({ home, setHome, stops, setStops, saved, setSaved, shape, setShape, keepOrder, setKeepOrder, route, routing, error, onFocus }: Props) {
+function PlannerView({ home, setHome, stops, setStops, saved, setSaved, shape, setShape, keepOrder, setKeepOrder, route, routing, error, onFocus }: Props) {
   const [editHome, setEditHome] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
   // Show stops in the order they'll be driven once a route exists.
@@ -187,3 +187,5 @@ function StopItem({ p, open, canMove, onMove, label, first, last, children }: {
     </Reorder.Item>
   )
 }
+
+export const Planner = memo(PlannerView)

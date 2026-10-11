@@ -73,7 +73,9 @@ export const onRequestGet: PagesFunction<Env> = (ctx) =>
   cached(ctx, 3600, async () => {
     const prov = new URL(ctx.request.url).searchParams.get('prov')
     if (isProv(prov)) return { updated: new Date().toISOString(), ...(await provinceCameras(prov)) }
-    const city = await getJSON<CityCam[]>('https://data.calgary.ca/resource/k7p9-kppz.json?$limit=2000', 3600)
+    // If one source is down the others still load (and the answer is marked partial).
+    let partial = false
+    const city = await getJSON<CityCam[]>('https://data.calgary.ca/resource/k7p9-kppz.json?$limit=2000', 3600).catch(() => { partial = true; return [] as CityCam[] })
     const cams: Camera[] = []
     for (const c of city) {
       const n = c.camera_url?.url.match(/loc(\d+)\.jpg/i)?.[1]
@@ -81,7 +83,6 @@ export const onRequestGet: PagesFunction<Env> = (ctx) =>
       if (!n || !p) continue
       cams.push({ id: `c${n}`, src: 'city', name: c.camera_location.trim(), area: c.quadrant ?? '', lat: p[1], lon: p[0] })
     }
-    let partial = false
     const pages = await abCameras(ctx.env).catch(() => { partial = true; return [] as AbCam[] })
     for (const a of pages) {
       const m = a.latLng.geography.wellKnownText.match(/POINT \((-?[\d.]+) (-?[\d.]+)\)/)

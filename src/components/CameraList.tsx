@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { memo, useCallback, useEffect, useRef } from 'react'
 import type { Camera, OnRoute, RoadCondition, Route } from '../lib/types'
 import { CameraCard } from './CameraCard'
 
 // Route cameras in driving order. Scrolling the list "drives" the map: the card crossing the middle of the
 // screen becomes active, its marker pings and the route lights up to it.
-export function CameraList({ cams, route, roads, active, setActive, scrollTo, onZoom }: {
+function CameraListView({ cams, route, roads, active, setActive, scrollTo, onZoom }: {
   cams: OnRoute<Camera>[]; route: Route; roads: Map<string, RoadCondition | null>; active: string | null; setActive: (id: string) => void
   scrollTo: { id: string; n: number } | null; onZoom: (c: Camera) => void
 }) {
@@ -31,6 +31,8 @@ export function CameraList({ cams, route, roads, active, setActive, scrollTo, on
     n.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' })
   }, [scrollTo])
 
+  const register = useCallback((id: string, el: HTMLElement | null) => { if (el) nodes.current.set(id, el); else nodes.current.delete(id) }, [])
+  const select = useCallback((id: string) => { quietUntil.current = Date.now() + 900; setActive(id) }, [setActive])
   const legLabel = (leg: number) => {
     const l = route.legs[leg]
     if (!l) return ''
@@ -42,14 +44,11 @@ export function CameraList({ cams, route, roads, active, setActive, scrollTo, on
     <ol className="cam-list">
       {cams.map((c, i) => (
         <li key={c.id}>
-          <CameraCard
-            cam={c} index={i} active={c.id === active} legLabel={legLabel(c.leg)} road={roads.get(c.id)}
-            cardRef={(el) => { if (el) nodes.current.set(c.id, el); else nodes.current.delete(c.id) }}
-            onSelect={() => { quietUntil.current = Date.now() + 900; setActive(c.id) }}
-            onZoom={() => onZoom(c)}
-          />
+          <CameraCard cam={c} index={i} active={c.id === active} legLabel={legLabel(c.leg)} road={roads.get(c.id)} cardRef={register} onSelect={select} onZoom={onZoom} />
         </li>
       ))}
     </ol>
   )
 }
+
+export const CameraList = memo(CameraListView)

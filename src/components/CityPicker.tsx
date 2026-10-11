@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { CITIES, regionName, type City } from '../lib/cities'
 import { Icon } from './Icon'
 
@@ -11,7 +11,7 @@ let counts: Promise<{ cities: { key: string; cams: number }[]; total: number }> 
 const loadCounts = () => (counts ??= fetch('/api/cities').then((r) => r.json() as Promise<{ cities: { key: string; cams: number }[]; total: number }>).catch((e) => { counts = null; throw e }))
 
 // The welcome (and the header's city button): what RouteX does, then one search across every Canadian city with cameras.
-export function CityPicker({ open, first, current, onPick, onClose }: {
+function CityPickerView({ open, first, current, onPick, onClose }: {
   open: boolean; first: boolean; current: string | null; onPick: (c: City) => void; onClose: () => void
 }) {
   const dlg = useRef<HTMLDialogElement>(null)
@@ -101,3 +101,5 @@ export function CityPicker({ open, first, current, onPick, onClose }: {
     </dialog>
   )
 }
+
+export const CityPicker = memo(CityPickerView)

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchCameras, fetchCommunities, setSearchNear, fetchEvents, fetchRoads, fetchWeather, planRoute } from './lib/api'
-import { LEVEL_TEXT, roadAt, roadGrade, routeLevel } from './lib/conditions'
+import { LEVEL_TEXT, roadAt, roadGrade, routeLevel, roadIsGood } from './lib/conditions'
 import { useFrames, useWatch } from './lib/frames'
 import { km, kmIn, mins, onRoute, overlaps, pointAt, track } from './lib/geo'
 import { DEFAULT_LAYERS, layerLabel, sourceLabel, type LayerKey } from './lib/layers'
@@ -11,7 +11,7 @@ import { useStored } from './lib/store'
 import { useWtaRoads, type View } from './lib/wta'
 import { useBump } from './lib/useSeen'
 import { AnimatePresence } from 'motion/react'
-import type { Camera, Community, OnRoute, OptimizeBy, Place, RoadEvent, Route, TripShape, Weather } from './lib/types'
+import type { Camera, Community, OnRoute, OptimizeBy, Place, RoadCondition, RoadEvent, Route, TripShape, Weather } from './lib/types'
 import { AlertsPanel } from './components/AlertsPanel'
 import { AreaShow } from './components/AreaShow'
 import { QUADRANTS, type Area } from './lib/areas'
@@ -36,6 +36,8 @@ import { DotPattern } from './components/magic/DotPattern'
 import { NumberTicker } from './components/magic/NumberTicker'
 
 type Tab = 'cameras' | 'alerts' | 'weather'
+// Shared empty lists, so props that are "nothing" don't change identity on every render (which re-runs map effects).
+const NONE: never[] = []
 
 function usePoll<T>(fn: () => Promise<T>, every: number, deps: unknown[] = []) {
   const [v, setV] = useState<T | null>(null)
@@ -70,7 +72,7 @@ export default function App() {
   const [keepOrder, setKeepOrder] = useStored<boolean>('keepOrder', true)
   const [layerPrefs, setLayerPrefs] = useStored<Partial<Record<LayerKey, boolean>>>('layers', {})
   const vis = { ...DEFAULT_LAYERS, ...layerPrefs }
-  const setVis = (k: LayerKey, on: boolean) => setLayerPrefs((v) => ({ ...v, [k]: on }))
+  const setVis = useCallback((k: LayerKey, on: boolean) => setLayerPrefs((v) => ({ ...v, [k]: on })), []) // eslint-disable-line react-hooks/exhaustive-deps
   const [basemap, setBasemap] = useStored<Basemap>('basemap', 'sat')
   const [names, setNames] = useStored('communities', false)
   const [communities, setCommunities] = useState<Community[] | null>(null)
@@ -106,14 +108,18 @@ export default function App() {
   NO_REPORT.text = prov === 'ab' ? 'City street · no 511 road report' : 'No road condition report here'
   if (home) setSearchNear(home.lat, home.lon, prov)
   else if (city) setSearchNear(city.lat, city.lon, prov)
-  const pickCity = (c: City) => {
+  const pickCity = useCallback((c: City) => {
     setCityKey(c.key); setCityOpen(false)
     setFlyTo({ lat: c.lat, lon: c.lon, zoom: cityZoom(c), n: Date.now() })
-  }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const [selEvent, setSelEvent] = useState<string | null>(null)
 
   // Each province's cameras load on their own; switching province swaps the whole set.
-  useEffect(() => { setCameras([]); fetchCameras(prov).then(setCameras).catch(() => {}) }, [prov])
+  useEffect(() => {
+    let live = true
+    setCameras([]); fetchCameras(prov).then((c) => live && setCameras(c)).catch(() => {})
+    return () => { live = false }
+  }, [prov])
   // A shared trip link (#trip=…) loads that trip, then the hash is cleared.
   useEffect(() => {
     const t = readTripLink()
@@ -121,20 +127,20 @@ export default function App() {
     setHome(t.home); setStops(() => t.stops); setShape(t.shape)
     history.replaceState(null, '', location.pathname + location.search)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  const loadRoute = (r: SavedRoute) => {
+  const loadRoute = useCallback((r: SavedRoute) => {
     setHome(r.home); setStops(() => r.stops.map((p) => ({ ...p, id: crypto.randomUUID() }))); setShape(r.shape)
-  }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const evData = usePoll(() => fetchEvents(prov), 120_000, [prov])
   const roadData = usePoll(() => fetchRoads(prov), 600_000, [prov])
-  const abRoads = roadData?.roads ?? []
-  const events = evData?.events ?? []
-  const alerts = evData?.alerts ?? []
+  const abRoads = roadData?.roads ?? NONE
+  const events = evData?.events ?? NONE
+  const alerts = evData?.alerts ?? NONE
   const [alertOpen, setAlertOpen] = useState(false)
 
   // ── route: re-plan when home, stops or shape change ──
   const stopKey = stops.map((s) => s.id).join(',')
   useEffect(() => {
-    if (!home || !stops.length) { setRoute(null); return }
+    if (!home || !stops.length) { setRoute(null); setRouting(false); setRouteError(''); return }
     const ctl = new AbortController()
     setRouting(true); setRouteError('')
     const t = setTimeout(() => {
@@ -144,17 +150,19 @@ export default function App() {
           // Have the other stop order ready, so flipping My stops / Optimize route doesn't wait on the router.
           if (stops.length > 1) planRoute(home, stops, shape, by, !keepOrder).catch(() => {})
         })
-        .catch((e) => { if (!ctl.signal.aborted) setRouteError(e.message === 'No route' ? 'No drivable route between these places' : 'Routing is busy, trying again shortly') })
+        // A failed re-plan clears the old route, so the map and cameras never show a trip the stops no longer match.
+        .catch((e) => { if (!ctl.signal.aborted) { setRoute(null); setRouteError(e.message === 'No route' ? 'No drivable route between these places' : 'Routing is busy, trying again shortly') } })
         .finally(() => !ctl.signal.aborted && setRouting(false))
-    }, 250)
+    }, 80)
     return () => { clearTimeout(t); ctl.abort() }
   }, [home?.id, home?.lat, stopKey, shape, by, keepOrder]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Retry a failed route once after a few seconds (the public OSRM server rate-limits bursts).
   useEffect(() => {
-    if (!routeError || !home || !stops.length) return
-    const t = setTimeout(() => planRoute(home, stops, shape, by, keepOrder).then((r) => { setRoute(r); setRouteError('') }).catch(() => {}), 4000)
-    return () => clearTimeout(t)
+    if (!routeError || routeError.startsWith('No drivable') || !home || !stops.length) return
+    const ctl = new AbortController()
+    const t = setTimeout(() => planRoute(home, stops, shape, by, keepOrder, ctl.signal).then((r) => { setRoute(r); setRouteError('') }).catch(() => {}), 4000)
+    return () => { clearTimeout(t); ctl.abort() }
   }, [routeError]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const routeCamsAll = useMemo(() => (route ? onRoute(route, cameras, CAM_RADIUS) : []), [route, cameras])
@@ -178,14 +186,14 @@ export default function App() {
   const routeCams = useMemo(() => routeCamsAll.filter((c) => vis[c.src]), [routeCamsAll, vis.city, vis.ab, vis.town]) // eslint-disable-line react-hooks/exhaustive-deps
   // Cameras on the route that a switched-off layer hides, by layer, so the planner can say why and offer to show them.
   const hiddenCams = (['city', 'ab', 'town'] as const).map((k) => ({ k, n: routeCamsAll.filter((c) => c.src === k && !vis[k]).length })).filter((x) => x.n)
-  const routeEvents = routeEventsAll.filter((e) => vis[e.kind])
+  const routeEvents = useMemo(() => routeEventsAll.filter((e) => vis[e.kind]), [routeEventsAll, vis.incident, vis.closure, vis.construction]) // eslint-disable-line react-hooks/exhaustive-deps
   const mapEvents = useMemo(() => events.filter((e) => vis[e.kind]), [events, vis.incident, vis.closure, vis.construction]) // eslint-disable-line react-hooks/exhaustive-deps
   const mapCameras = useMemo(() => (route && !vis.others ? [] : cameras.filter((c) => vis[c.src])), [cameras, route, vis.others, vis.city, vis.ab, vis.town]) // eslint-disable-line react-hooks/exhaustive-deps
   // Keyed 511 data has each segment's shape: match by location. Otherwise fall back to the highway numbers the route uses.
   const routeRoads = useMemo(() => (route ? roads.filter((r) => (r.line?.length ? overlaps(route, r.line) : route.highways.some((h) => h.toUpperCase() === r.hwy.toUpperCase()))) : []), [route, roads])
   const routeStations = useMemo(() => {
     if (!route) return []
-    return (roadData?.stations ?? []).map((s) => ({ ...s, ...onRoute(route, [s], 3000)[0] })).filter((s) => s.along != null).sort((a, b) => a.along - b.along)
+    return onRoute(route, roadData?.stations ?? [], 3000)
   }, [route, roadData])
 
   // The 511 report for the road each route camera shows (null on city streets).
@@ -208,7 +216,7 @@ export default function App() {
     }
     return pts.sort((a, b) => a.along - b.along).slice(0, 10)
   }, [route, shape])
-  const weather = usePoll<Weather[]>(() => fetchWeather(wxPoints), 900_000, [wxPoints]) ?? []
+  const weather = usePoll<Weather[]>(() => fetchWeather(wxPoints), 900_000, [wxPoints]) ?? NONE
 
   const { frames } = useFrames()
   const staleCams = routeCamsAll.filter((c) => { const f = frames.get(c.id); return f?.lm && Date.now() - f.lm > STALE_MS }).length
@@ -216,6 +224,14 @@ export default function App() {
   const focusAlong = routeCams.find((c) => c.id === active)?.along ?? null
 
   // A route camera tapped on the map scrolls its card into view; in full screen (or off the route) it opens the swipe-up panel.
+  // Stable handlers for the memoised panels.
+  const addStop = useCallback((p: Place) => setStops((s) => [...s, p]), []) // eslint-disable-line react-hooks/exhaustive-deps
+  const unfollow = useCallback(() => setFollow(false), [])
+  const focusPlace = useCallback((p: Place) => setFlyTo({ lat: p.lat, lon: p.lon, zoom: 16, n: Date.now() }), [])
+  const showRoad = useCallback((r: RoadCondition) => { const m = r.line?.[Math.floor((r.line.length - 1) / 2)]; if (m) setFlyTo({ lat: m[0], lon: m[1], zoom: 12, n: Date.now() }) }, [])
+  const closeZoom = useCallback(() => setZoom(null), [])
+  const closeAreas = useCallback(() => setAreasOpen(false), [])
+  const closeLeaving = useCallback(() => setLeaving(false), [])
   const onCam = useCallback((id: string) => {
     const c = routeCams.find((x) => x.id === id)
     if (c) setActive(id)
@@ -299,7 +315,7 @@ export default function App() {
   const sheetCam = sheet ? cameras.find((c) => c.id === sheet) ?? null : null
   const sheetIdx = sheet ? routeCams.findIndex((c) => c.id === sheet) : -1
   const stepSheet = (d: number) => { const c = routeCams[sheetIdx + d]; if (c) { setSheet(c.id); setActive(c.id) } }
-  const layerCounts: Partial<Record<LayerKey, number>> = route
+  const layerCounts: Partial<Record<LayerKey, number>> = useMemo(() => route
     ? {
         city: routeCamsAll.filter((c) => c.src === 'city').length, ab: routeCamsAll.filter((c) => c.src === 'ab').length, town: routeCamsAll.filter((c) => c.src === 'town').length, others: cameras.length - routeCamsAll.length,
         incident: routeEventsAll.filter((e) => e.kind === 'incident').length, closure: routeEventsAll.filter((e) => e.kind === 'closure').length,
@@ -308,13 +324,14 @@ export default function App() {
     : {
         city: cameras.filter((c) => c.src === 'city').length, ab: cameras.filter((c) => c.src === 'ab').length, town: cameras.filter((c) => c.src === 'town').length,
         incident: events.filter((e) => e.kind === 'incident').length, closure: events.filter((e) => e.kind === 'closure').length, construction: events.filter((e) => e.kind === 'construction').length, allRoads: allRoads.length,
-      }
-  const shownRoads = vis.roads ? routeRoads : []
+      }, [route, routeCamsAll, routeEventsAll, routeRoads, allRoads, cameras, events])
+  const shownRoads = vis.roads ? routeRoads : NONE
+  const grades = useMemo(() => [...shownRoads, ...(vis.allRoads ? allRoads : NONE)].map(roadGrade), [shownRoads, allRoads, vis.allRoads])
 
-  const showEvent = (e: RoadEvent) => { setSelEvent(e.id); setFlyTo({ lat: e.lat, lon: e.lon, zoom: 16, n: Date.now() }) }
+  const showEvent = useCallback((e: RoadEvent) => { setSelEvent(e.id); setFlyTo({ lat: e.lat, lon: e.lon, zoom: 16, n: Date.now() }) }, [])
   const onEvent = (id: string) => { const e = events.find((x) => x.id === id); if (e) { setTab('alerts'); showEvent(e) } }
 
-  const alertCount = routeEvents.length + shownRoads.filter((r) => !/bare (dry|wet)/i.test(r.condition)).length
+  const alertCount = routeEvents.length + shownRoads.filter((r) => !roadIsGood(r)).length
   const hasTrip = !!route && !!home
   const alertBump = useBump(alertCount)
 
@@ -353,12 +370,12 @@ export default function App() {
       <main className="layout">
         <div className={`map-col ${full ? 'is-full' : ''}`} ref={mapCol}>
           <MapView
-            cameras={mapCameras} routeCams={routeCams} route={route} events={mapEvents} routeEventIds={routeEventIds} routeRoads={shownRoads} allRoads={vis.allRoads ? allRoads : []} onView={setMapView}
-            basemap={basemap} communities={names && nearCalgary ? communities ?? [] : []} me={fix}
+            cameras={mapCameras} routeCams={routeCams} route={route} events={mapEvents} routeEventIds={routeEventIds} routeRoads={shownRoads} allRoads={vis.allRoads ? allRoads : NONE} onView={vis.allRoads && prov !== 'ab' ? setMapView : undefined}
+            basemap={basemap} communities={names && nearCalgary ? communities ?? NONE : NONE} me={fix}
             home={home} start={city ? { lat: city.lat, lon: city.lon, zoom: cityZoom(city) } : null} activeCam={active} focusAlong={focusAlong}
             onCam={onCam} onEvent={onEvent}
-            onAddStop={(p) => setStops((s) => [...s, p])} onSetHome={setHome} flyTo={flyTo}
-            driven={liveOn && live!.off <= ON_ROUTE_M ? live!.along : null} follow={liveOn && follow} onUnfollow={() => setFollow(false)}
+            onAddStop={addStop} onSetHome={setHome} flyTo={flyTo}
+            driven={liveOn && live!.off <= ON_ROUTE_M ? live!.along : null} follow={liveOn && follow} onUnfollow={unfollow}
             controls={<>
               <button className={`map-btn loc-btn ${locOn && !fix ? 'is-seeking' : ''}`} onClick={() => { setLocMsg(''); setLocOn(!locOn) }} aria-pressed={locOn}
                 aria-label={locOn ? 'Hide my location' : 'Show my location'} title={locOn ? (fix ? `Hide my location (±${Math.round(fix.acc)} m)` : 'Finding you…') : 'Show my location'}>
@@ -369,7 +386,7 @@ export default function App() {
               </button>
             </>}
           />
-          <MapLayers vis={vis} setVis={setVis} counts={layerCounts} hasTrip={hasTrip} prov={prov} grades={[...shownRoads, ...(vis.allRoads ? allRoads : [])].map(roadGrade)}
+          <MapLayers vis={vis} setVis={setVis} counts={layerCounts} hasTrip={hasTrip} prov={prov} grades={grades}
             basemap={basemap} setBasemap={setBasemap} names={names} setNames={setNames} namesCount={communities?.length} nearCalgary={nearCalgary} />
           <div className="map-tools">
             {full && hasTrip && (
@@ -412,7 +429,7 @@ export default function App() {
           <Planner
             home={home} setHome={setHome} stops={stops} setStops={setStops} saved={saved} setSaved={setSaved}
             shape={shape} setShape={setShape} keepOrder={keepOrder} setKeepOrder={setKeepOrder} route={route} routing={routing} error={routeError}
-            onFocus={(p) => setFlyTo({ lat: p.lat, lon: p.lon, zoom: 16, n: Date.now() })}
+            onFocus={focusPlace}
           />
 
           <SavedRoutes routes={savedRoutes} setRoutes={setSavedRoutes} onLoad={loadRoute} />
@@ -475,20 +492,20 @@ export default function App() {
               ) : (
                 <div className="quiet"><Icon name="camera" size={20} /><p>{routeCamsAll.length ? 'Every camera on this route is in a layer that is switched off. Turn it on above or in Layers on the map.' : `No cameras within ${CAM_RADIUS} m of this route.`}</p></div>
               ))}
-              {tab === 'alerts' && <AlertsPanel events={routeEvents} roads={shownRoads} highways={route.highways} route={route} onShowRoad={(r) => { const m = r.line?.[Math.floor((r.line.length - 1) / 2)]; if (m) setFlyTo({ lat: m[0], lon: m[1], zoom: 12, n: Date.now() }) }} onShow={showEvent} selected={selEvent} />}
+              {tab === 'alerts' && <AlertsPanel events={routeEvents} roads={shownRoads} highways={route.highways} route={route} onShowRoad={showRoad} onShow={showEvent} selected={selEvent} />}
               {tab === 'weather' && <WeatherPanel weather={weather} stations={routeStations} />}
             </>
           )}
-          <footer className="foot">Cameras: City of Calgary &amp; 511 Alberta · Routing: OSRM · Weather: Open-Meteo</footer>
+          <footer className="foot">Cameras: city traffic departments, provincial 511 services and DriveBC · Routing: OSRM · Weather: Open-Meteo · Maps: Esri</footer>
         </aside>
       </main>
 
-      <ZoomView cam={zoom} onClose={() => setZoom(null)} />
+      <ZoomView cam={zoom} onClose={closeZoom} />
       <CityPicker open={cityOpen} first={cityKey == null} current={cityKey} onPick={pickCity}
         onClose={() => { setCityOpen(false); if (cityKey == null) setCityKey('calgary') }} />
-      <AreaShow open={areasOpen} onClose={() => setAreasOpen(false)} cameras={cameras} roads={roads} prov={prov} cityKey={cityKey} area={area} setArea={setArea}
+      <AreaShow open={areasOpen} onClose={closeAreas} cameras={cameras} roads={roads} prov={prov} cityKey={cityKey} area={area} setArea={setArea}
         lists={camLists} setLists={setCamLists} listId={listId} setListId={setListId} onZoom={setZoom} />
-      {route && <BeforeILeave open={leaving} onClose={() => setLeaving(false)} route={route} cams={routeCams} events={routeEvents as OnRoute<RoadEvent>[]} camRoads={camRoads} weather={weather} level={level} reasons={reasons} allEvents={routeEventsAll} alerts={alerts} onZoom={setZoom} />}
+      {route && <BeforeILeave open={leaving} onClose={closeLeaving} route={route} cams={routeCams} events={routeEvents as OnRoute<RoadEvent>[]} camRoads={camRoads} weather={weather} level={level} reasons={reasons} allEvents={routeEventsAll} alerts={alerts} onZoom={setZoom} />}
     </div>
   )
 }

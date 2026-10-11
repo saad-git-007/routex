@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { sky, type Level } from '../lib/conditions'
-import { km, kmIn, mins } from '../lib/geo'
+import { km, kmIn, mins, extent } from '../lib/geo'
 import type { Alert, Camera, OnRoute, RoadCondition, RoadEvent, Route, Weather } from '../lib/types'
 import { Freshness, RoadNote, Shot } from './CameraCard'
 import { Icon } from './Icon'
@@ -9,7 +9,7 @@ import { LevelDetails } from './LevelDetails'
 const DWELL = 5000
 
 // Full-screen, one camera per screen in driving order, auto-advancing. Glance through the whole drive in a minute.
-export function BeforeILeave({ open, onClose, route, cams, events, camRoads, weather, level, reasons, allEvents, alerts, onZoom }: {
+function BeforeILeaveView({ open, onClose, route, cams, events, camRoads, weather, level, reasons, allEvents, alerts, onZoom }: {
   open: boolean; onClose: () => void; route: Route; cams: OnRoute<Camera>[]; events: OnRoute<RoadEvent>[]; camRoads: Map<string, RoadCondition | null>
   weather: Weather[]; level: Level; reasons: string[]; allEvents: OnRoute<RoadEvent>[]; alerts: Alert[]; onZoom: (c: Camera) => void
 }) {
@@ -51,10 +51,11 @@ export function BeforeILeave({ open, onClose, route, cams, events, camRoads, wea
   // Mini route: equirectangular projection into a 100-wide box.
   const mini = useMemo(() => {
     const lats = route.coords.map((c) => c[0]), lons = route.coords.map((c) => c[1])
-    const k = Math.cos((((Math.min(...lats) + Math.max(...lats)) / 2) * Math.PI) / 180)
-    const w = (Math.max(...lons) - Math.min(...lons)) * k || 1e-3, h = Math.max(...lats) - Math.min(...lats) || 1e-3
+    const [la0, la1] = extent(lats), [lo0, lo1] = extent(lons)
+    const k = Math.cos((((la0 + la1) / 2) * Math.PI) / 180)
+    const w = (lo1 - lo0) * k || 1e-3, h = la1 - la0 || 1e-3
     const s = 88 / Math.max(w, h), W = w * s + 12, H = h * s + 12
-    const xy = (lat: number, lon: number) => [6 + (lon - Math.min(...lons)) * k * s, 6 + (Math.max(...lats) - lat) * s] as const
+    const xy = (lat: number, lon: number) => [6 + (lon - lo0) * k * s, 6 + (la1 - lat) * s] as const
     const step = Math.max(1, Math.floor(route.coords.length / 400))
     const d = route.coords.filter((_, j) => j % step === 0).map(([a, b], j) => `${j ? 'L' : 'M'}${xy(a, b).map((v) => v.toFixed(2)).join(' ')}`).join('')
     return { W, H, d, xy }
@@ -129,3 +130,5 @@ export function BeforeILeave({ open, onClose, route, cams, events, camRoads, wea
     </dialog>
   )
 }
+
+export const BeforeILeave = memo(BeforeILeaveView)

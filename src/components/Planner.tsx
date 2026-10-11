@@ -98,7 +98,7 @@ function PlannerView({ home, setHome, stops, setStops, saved, setSaved, shape, s
                     <button className="stop-main" aria-expanded={isOpen} onClick={() => { setOpen(isOpen ? null : p.id); if (!isOpen) onFocus(p) }}>
                       <span className="stop-label" title={p.label}>{shortLabel(p.label)}</span>
                       <span className="stop-meta tnum">
-                        {leg ? <><span>{Math.round(leg.duration / 60)} min · {km(leg.distance)}</span> <span>from {i === 0 ? 'Home' : `D${i}`}</span> <span>· arrive {clock(arrive[i])}</span></> : p.label.split(',').slice(1, 3).join(',') || 'Destination'}
+                        {leg ? <><span>{Math.round(leg.duration / 60)} min · {km(leg.distance)}</span> <span>· arrive {clock(arrive[i])}</span></> : p.label.split(',').slice(1, 3).join(',') || 'Destination'}
                       </span>
                     </button>
                     <button
@@ -128,7 +128,7 @@ function PlannerView({ home, setHome, stops, setStops, saved, setSaved, shape, s
               })}
             </AnimatePresence>
             {shape === 'round' && list.length > 0 && (
-              <li className="stop-return"><div className="stop-row"><span className="node node-home node-return"><Icon name="home" size={14} /></span><span className="stop-main is-static"><span className="stop-label">Back home</span>{routeMatches && <span className="stop-meta tnum"><span>{Math.round(route.legs[route.legs.length - 1].duration / 60)} min · {km(route.legs[route.legs.length - 1].distance)}</span> <span>from D{list.length}</span> <span>· arrive {clock(arrive[arrive.length - 1])}</span></span>}</span></div></li>
+              <li className="stop-return"><div className="stop-row"><span className="node node-home node-return"><Icon name="home" size={14} /></span><span className="stop-main is-static"><span className="stop-label">Back home</span>{routeMatches && <span className="stop-meta tnum"><span>{Math.round(route.legs[route.legs.length - 1].duration / 60)} min · {km(route.legs[route.legs.length - 1].distance)}</span> <span>· arrive {clock(arrive[arrive.length - 1])}</span></span>}</span></div></li>
             )}
           </Reorder.Group>
 

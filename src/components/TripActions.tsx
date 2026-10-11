@@ -41,8 +41,8 @@ export function TripActions({ route, home, stops, shape, by, routes, setRoutes }
       <button className={`btn-sm ${mine ? 'is-on' : ''}`} aria-pressed={!!mine} onClick={save} title={mine ? 'Remove from saved routes' : 'Save this route in this browser'}>
         <Icon name="bookmark" size={15} fill={!!mine} /> {mine ? 'Saved' : <>Save<span className="ta-more"> route</span></>}
       </button>
-      <a className="btn-sm btn-link" href={gm.url} target="_blank" rel="noopener" onClick={openMaps} title={gm.dropped ? `Google Maps takes 9 stops in between; the last ${gm.dropped} are left out` : 'Open the whole route, in this order, in Google Maps (Apple Maps on iPhone without Google Maps)'}>
-        <Icon name="external" size={15} /> <span><span className="ta-more">Google </span>Maps</span>
+      <a className="btn-sm btn-link" href={gm.url} target="_blank" rel="noopener" onClick={openMaps} title={gm.dropped ? `Google Maps takes 9 stops in between; the last ${gm.dropped} are left out` : 'Open the route in Google Maps (on iPhone, Apple Maps if Google Maps isn\'t installed)'}>
+        <Icon name="external" size={15} /> <span><span className="ta-more">Open in </span>Maps</span>
       </a>
       <button className="btn-sm" onClick={share} title="Copy a link that opens this trip"><Icon name="share" size={15} /> Share</button>
       <span className="trip-note" role="status">{note}</span>

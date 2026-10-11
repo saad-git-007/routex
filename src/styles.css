@@ -896,3 +896,7 @@ html, body { touch-action: pan-x pan-y; }
 .a2hs li svg { vertical-align: -2px; color: var(--accent); }
 .a2hs b { color: var(--text); font-weight: 600; }
 .a2hs .btn-accent { justify-self: end; }
+/* List picker: the camera map is its own layer, so the address suggestions above it always draw in front. */
+.pick-map { z-index: 0; isolation: isolate; }
+.areashow.is-editing .bil-rail { position: relative; z-index: 5; }
+.pick-address .search-list { z-index: 60; max-height: 50vh; overflow-y: auto; }

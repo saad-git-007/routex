@@ -237,6 +237,8 @@ export default function App() {
   useEffect(() => { if (!locMsg) return; const t = setTimeout(() => setLocMsg(''), 8000); return () => clearTimeout(t) }, [locMsg])
   // Full-screen map. iPad Safari only has the webkit-prefixed Fullscreen API; iPhone Safari has none, so there the map
   // fills the page (and a one-time tip says that adding RouteX to the Home Screen hides Safari's bars too).
+  const [a2hs, setA2hs] = useState(false)
+  const closeA2hs = () => { setA2hs(false); try { localStorage.setItem('ct:a2hs', '1') } catch { /* private mode */ } }
   const toggleFull = () => {
     type WkEl = HTMLElement & { webkitRequestFullscreen?: () => void }
     type WkDoc = Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void }
@@ -246,7 +248,9 @@ export default function App() {
       if (el?.requestFullscreen) el.requestFullscreen().catch(() => {})
       else if (el?.webkitRequestFullscreen) el.webkitRequestFullscreen()
       else if (isApple() && !matchMedia('(display-mode: standalone)').matches && !(navigator as Navigator & { standalone?: boolean }).standalone) {
-        try { if (!localStorage.getItem('ct:a2hs')) { localStorage.setItem('ct:a2hs', '1'); setLocMsg('Tip: for a true full screen with no Safari bars, tap Share, then Add to Home Screen, and open RouteX from there.') } } catch { /* private mode */ }
+        let seen = false
+        try { seen = !!localStorage.getItem('ct:a2hs') } catch { /* private mode */ }
+        if (!seen) setA2hs(true)
       }
     } else {
       setFull(false)
@@ -348,6 +352,19 @@ export default function App() {
             )}
             {locMsg && !fix && <span className="loc-msg" role="status">{locMsg}</span>}
           </div>
+          {a2hs && full && (
+            <div className="a2hs" role="dialog" aria-labelledby="a2hs-h">
+              <button className="btn-icon btn-xs a2hs-x" onClick={closeA2hs} aria-label="Close"><Icon name="x" size={16} /></button>
+              <p className="eyebrow-sm" id="a2hs-h">Make it truly full screen</p>
+              <p>iPhone Safari keeps its bars on screen. Add RouteX to your Home Screen and open it from there to get the whole screen, like an app.</p>
+              <ol>
+                <li>Tap <Icon name="share" size={15} /> <b>Share</b> in Safari's toolbar</li>
+                <li>Choose <b>Add to Home Screen</b></li>
+                <li>Open <b>RouteX</b> from your Home Screen</li>
+              </ol>
+              <button className="btn-accent btn-sm" onClick={closeA2hs}>Got it</button>
+            </div>
+          )}
           <AnimatePresence>{sheetCam && (
             <CamSheet
               key="sheet"

@@ -870,3 +870,10 @@ html.is-map-full, html.is-map-full body { overflow: hidden; }
 
 /* Double tap opens a camera card full screen; stop the browser treating it as a page zoom. */
 .cam-hit { touch-action: manipulation; }
+
+/* Route cameras hidden by a switched-off layer. */
+.hidden-cams { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 12px; border-radius: var(--r-md); background: var(--review-soft); box-shadow: inset 0 0 0 1px var(--review-line); color: var(--review); font-size: .8rem; }
+.hidden-cams svg { flex: none; }
+.hidden-cams p { flex: 1; min-width: 0; color: var(--text-2); line-height: 1.4; }
+.hidden-cams b { color: var(--text); font-weight: 600; }
+.hidden-cams .btn-sm { flex: none; border-color: var(--review-line); color: var(--text); }

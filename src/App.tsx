@@ -3,7 +3,7 @@ import { fetchCameras, fetchCommunities, setSearchNear, fetchEvents, fetchRoads,
 import { LEVEL_TEXT, roadAt, roadGrade, routeLevel } from './lib/conditions'
 import { useFrames, useWatch } from './lib/frames'
 import { km, kmIn, mins, onRoute, overlaps, pointAt } from './lib/geo'
-import { DEFAULT_LAYERS, sourceLabel, type LayerKey } from './lib/layers'
+import { DEFAULT_LAYERS, layerLabel, sourceLabel, type LayerKey } from './lib/layers'
 import { ripple } from './lib/ripple'
 import { useLiveLocation } from './lib/useLocation'
 import type { CamList } from './lib/lists'
@@ -171,6 +171,8 @@ export default function App() {
   const routeEventIds = useMemo(() => new Set(routeEventsAll.map((e) => e.id)), [routeEventsAll])
   // What's shown follows the layer switches.
   const routeCams = useMemo(() => routeCamsAll.filter((c) => vis[c.src]), [routeCamsAll, vis.city, vis.ab, vis.town]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Cameras on the route that a switched-off layer hides, by layer, so the planner can say why and offer to show them.
+  const hiddenCams = (['city', 'ab', 'town'] as const).map((k) => ({ k, n: routeCamsAll.filter((c) => c.src === k && !vis[k]).length })).filter((x) => x.n)
   const routeEvents = routeEventsAll.filter((e) => vis[e.kind])
   const mapEvents = useMemo(() => events.filter((e) => vis[e.kind]), [events, vis.incident, vis.closure, vis.construction]) // eslint-disable-line react-hooks/exhaustive-deps
   const mapCameras = useMemo(() => (route && !vis.others ? [] : cameras.filter((c) => vis[c.src])), [cameras, route, vis.others, vis.city, vis.ab, vis.town]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -294,7 +296,7 @@ export default function App() {
             <Icon name="pin" size={16} /><span>{city?.name ?? 'City'}</span>
           </button>
           <button className="btn-areas has-rpl" onPointerDown={ripple} onClick={() => setAreasOpen(true)} aria-label="Areas: five cameras spread across a part of the city" title="Areas">
-            <Icon name="camera" size={16} /><span>Areas</span>
+            <Icon name="cctv" size={17} /><span>Areas</span>
           </button>
           <button className="btn-leave has-rpl" onPointerDown={ripple} disabled={!routeCams.length} onClick={() => setLeaving(true)} aria-label="See cameras on your route, full screen">
             <Icon name="play" size={14} fill /><span>See cameras on your route</span>
@@ -385,6 +387,14 @@ export default function App() {
                 <div className={`stat ${alertCount ? 'is-alert' : ''}`}><strong><NumberTicker value={alertCount} /></strong><span>alerts</span></div>
               </div>
 
+              {hiddenCams.length > 0 && (
+                <div className="hidden-cams" role="status">
+                  <Icon name="layers" size={16} />
+                  <p><b>{hiddenCams.reduce((a, x) => a + x.n, 0)} {hiddenCams.reduce((a, x) => a + x.n, 0) === 1 ? 'camera' : 'cameras'} on this route {hiddenCams.reduce((a, x) => a + x.n, 0) === 1 ? 'is' : 'are'} hidden.</b> {hiddenCams.map((x) => layerLabel(x.k, prov)).join(' and ')} {hiddenCams.length === 1 ? 'is' : 'are'} switched off in Layers.</p>
+                  <button className="btn-sm" onClick={() => hiddenCams.forEach((x) => setVis(x.k, true))}>Turn on</button>
+                </div>
+              )}
+
               <TripActions route={route} home={home} stops={stops} shape={shape} by={by} routes={savedRoutes} setRoutes={setSavedRoutes} />
 
               <div className="tabs-sticky">
@@ -401,7 +411,7 @@ export default function App() {
               {tab === 'cameras' && (routeCams.length ? (
                 <CameraList cams={routeCams} route={route} roads={camRoads} active={active} setActive={setActive} scrollTo={scrollTo} onZoom={setZoom} />
               ) : (
-                <div className="quiet"><Icon name="camera" size={20} /><p>{routeCamsAll.length ? 'Camera layers are switched off. Turn them back on in Layers on the map.' : `No cameras within ${CAM_RADIUS} m of this route.`}</p></div>
+                <div className="quiet"><Icon name="camera" size={20} /><p>{routeCamsAll.length ? 'Every camera on this route is in a layer that is switched off. Turn it on above or in Layers on the map.' : `No cameras within ${CAM_RADIUS} m of this route.`}</p></div>
               ))}
               {tab === 'alerts' && <AlertsPanel events={routeEvents} roads={shownRoads} highways={route.highways} route={route} onShowRoad={(r) => { const m = r.line?.[Math.floor((r.line.length - 1) / 2)]; if (m) setFlyTo({ lat: m[0], lon: m[1], zoom: 12, n: Date.now() }) }} onShow={showEvent} selected={selEvent} />}
               {tab === 'weather' && <WeatherPanel weather={weather} stations={routeStations} />}

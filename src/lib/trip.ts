@@ -2,7 +2,23 @@ import type { OptimizeBy, Place, Route, TripShape } from './types'
 
 export type SavedRoute = { id: string; name: string; home: Place; stops: Place[]; shape: TripShape; by: OptimizeBy; fav: boolean; saved: number }
 
-const short = (p: Place) => p.label.split(',')[0]
+// A place as a short name: the street number and street (or the place's name), without the city, province or postal code.
+const POSTAL = /\b[A-Z]\d[A-Z] ?\d[A-Z]\d\b/i
+const ABBR: Record<string, string> = {
+  northwest: 'NW', northeast: 'NE', southwest: 'SW', southeast: 'SE', street: 'St', avenue: 'Ave', road: 'Rd', drive: 'Dr',
+  boulevard: 'Blvd', trail: 'Tr', crescent: 'Cres', court: 'Crt', highway: 'Hwy', parkway: 'Pkwy',
+}
+const STREET = new RegExp(`\\b(${Object.keys(ABBR).join('|')})\\b`, 'gi')
+export const shortLabel = (label: string) => {
+  const first = label.split(',')[0].trim()
+  if (new RegExp(`^${POSTAL.source}$`, 'i').test(first)) return first
+  const parts = label.split(',').map((x) => x.replace(POSTAL, '').trim()).filter(Boolean)
+  if (!parts.length) return label
+  const name = /^\d+[A-Z]?$/i.test(parts[0]) && parts[1] ? `${parts[0]} ${parts[1]}` : parts[0]
+  // Street words are shortened only in addresses ("123 Main Street Southwest"), never in a place's own name.
+  return /^\d/.test(name) ? name.replace(STREET, (w) => ABBR[w.toLowerCase()]) : name
+}
+const short = (p: Place) => shortLabel(p.label)
 export const routeName = (_home: Place, stops: Place[]) => ['Home', ...stops.map(short)].join(' → ')
 
 // Google Maps directions URL (free, no key). Stops go in the optimized order; Maps takes up to 9 waypoints.

@@ -110,7 +110,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .planner { padding: 14px; display: grid; gap: 12px; }
 .planner-home { display: flex; align-items: center; gap: 12px; }
 .planner-place { flex: 1; min-width: 0; display: grid; gap: 1px; }
-.planner-place b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.planner-place b { font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: anywhere; }
 .planner-grow { flex: 1; min-width: 0; display: flex; gap: 6px; align-items: center; }
 .planner-grow .search { flex: 1; }
 .node { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-line); font: 600 .7rem/1 var(--font-mono); letter-spacing: -.03em; }
@@ -127,7 +127,8 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .stop-main:active:not(:disabled) { scale: 1; background-color: var(--surface-3); transition-duration: 0ms; }
 .stop-main.is-static { cursor: default; }
 .stop-main.is-static:hover { background: transparent; }
-.stop-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .92rem; font-weight: 550; color: var(--text); }
+@media (max-width: 420px) { .stop-row { gap: 2px; } .stop-row > .node { margin-right: 8px; } }
+.stop-label { max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow-wrap: anywhere; font-size: .92rem; font-weight: 550; color: var(--text); }
 .stop-meta { max-width: 100%; font-size: .76rem; font-weight: 400; color: var(--text-muted); }
 /* Stop badges match the map's stop markers: white circle, dark number, blue ring. */
 .stop-row > .node:not(.node-home) { width: 30px; height: 30px; background: #e3f8ff; color: var(--on-accent); font: 700 11px/1 var(--font-mono); box-shadow: 0 0 0 2px rgba(4,6,11,.85), 0 0 0 3.5px var(--accent); }

@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { km } from '../lib/geo'
+import { shortLabel } from '../lib/trip'
 import type { Route } from '../lib/types'
 import { Icon } from './Icon'
 
@@ -16,7 +17,7 @@ export function LiveTrip({ route, pos, follow, onFollow, open, setOpen, overlay 
 }) {
   const round = route.order.length > 2 && route.order[route.order.length - 1].id === route.order[0].id
   const name = (i: number) => (i === 0 || (round && i === route.order.length - 1) ? 'Home' : `D${i}`)
-  const label = (i: number) => route.order[i].label.split(',')[0]
+  const label = (i: number) => shortLabel(route.order[i].label)
   const badge = (i: number) => <span className={`lt-badge ${name(i) === 'Home' ? 'is-home' : ''}`}>{name(i) === 'Home' ? <Icon name="home" size={12} /> : name(i)}</span>
 
   const off = pos.off > ON_ROUTE_M

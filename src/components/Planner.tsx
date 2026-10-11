@@ -2,6 +2,7 @@ import { AnimatePresence, motion, Reorder, useDragControls } from 'motion/react'
 import { memo, useEffect, useState, type ReactNode } from 'react'
 import { satThumb } from '../lib/api'
 import { km } from '../lib/geo'
+import { shortLabel } from '../lib/trip'
 import type { Place, Route, TripShape } from '../lib/types'
 import { AddressSearch } from './AddressSearch'
 import { Icon } from './Icon'
@@ -71,7 +72,7 @@ function PlannerView({ home, setHome, stops, setStops, saved, setSaved, shape, s
           <>
             <div className="planner-place">
               <span className="eyebrow-sm">Home</span>
-              <b>{home.label}</b>
+              <b title={home.label}>{shortLabel(home.label)}</b>
             </div>
             <button className="btn-icon" onClick={() => setEditHome(true)} aria-label="Change home" title="Change home"><Icon name="edit" size={16} /></button>
           </>
@@ -92,10 +93,10 @@ function PlannerView({ home, setHome, stops, setStops, saved, setSaved, shape, s
                 const leg = routeMatches ? route.legs[i] : undefined
                 const isOpen = open === p.id
                 return (
-                  <StopItem key={p.id} p={p} open={isOpen} canMove={list.length > 1} onMove={(d) => move(i, d)} label={p.label.split(',')[0]} first={i === 0} last={i === list.length - 1} row={<>
+                  <StopItem key={p.id} p={p} open={isOpen} canMove={list.length > 1} onMove={(d) => move(i, d)} label={shortLabel(p.label)} first={i === 0} last={i === list.length - 1} row={<>
                     <span className="node">D{i + 1}</span>
                     <button className="stop-main" aria-expanded={isOpen} onClick={() => { setOpen(isOpen ? null : p.id); if (!isOpen) onFocus(p) }}>
-                      <span className="stop-label">{p.label.split(',')[0]}</span>
+                      <span className="stop-label" title={p.label}>{shortLabel(p.label)}</span>
                       <span className="stop-meta tnum">
                         {leg ? <><span>{Math.round(leg.duration / 60)} min · {km(leg.distance)}</span> <span>from {i === 0 ? 'Home' : `D${i}`}</span> <span>· arrive {clock(arrive[i])}</span></> : p.label.split(',').slice(1, 3).join(',') || 'Destination'}
                       </span>
@@ -118,7 +119,7 @@ function PlannerView({ home, setHome, stops, setStops, saved, setSaved, shape, s
                       <div className="stop-preview">
                         <div className="stop-sat"><img src={satThumb(p.lat, p.lon)} alt={`Satellite view of ${p.label}`} loading="lazy" /><i aria-hidden>D{i + 1}</i></div>
                         <p>{p.label}</p>
-                        {leg && <p className="stop-meta tnum">Stop {i + 1} of {list.length} · from {i === 0 ? 'home' : list[i - 1].label.split(',')[0]}</p>}
+                        {leg && <p className="stop-meta tnum">Stop {i + 1} of {list.length} · from {i === 0 ? 'home' : shortLabel(list[i - 1].label)}</p>}
                       </div>
                       </motion.div>
                     )}</AnimatePresence>

@@ -910,7 +910,7 @@ html, body { touch-action: pan-x pan-y; }
 .live-head { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-start; gap: 9px; min-height: 44px; padding: 0 6px 0 8px; border: 0; background: transparent; color: var(--text); text-align: left; }
 .live-head:hover:not(:disabled) { background: transparent; }
 .live-head > svg { flex: none; color: var(--text-muted); }
-.live-sum { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; font-size: .86rem; white-space: nowrap; overflow: hidden; }
+.live-sum { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 4px 0 4px 4px; font-size: .86rem; white-space: nowrap; overflow: hidden; }
 .live-sum b { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--text); }
 .live-sum .tnum { flex: none; color: var(--text-2); font-size: .8rem; }
 .live-tag { flex: none; display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border-radius: var(--r-full); background: rgba(242,98,107,.16); color: #ff8a92; font: 700 .62rem/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; }
@@ -920,7 +920,8 @@ html, body { touch-action: pan-x pan-y; }
 .live-follow { flex: none; }
 .live-follow.is-on { color: var(--accent); background: var(--accent-soft); }
 .live-body { overflow: hidden; display: grid; gap: 10px; padding: 0 8px; }
-.live-body > :first-child { margin-top: 4px; }
+/* Room for the badges' rings, which the folding animation's overflow would otherwise cut off. */
+.live-body > :first-child { margin: 4px 0; padding: 4px 4px; }
 .live-note { font-size: .8rem; color: var(--text-2); }
 .lt-badge { flex: none; display: grid; place-items: center; min-width: 24px; height: 24px; padding: 0 3px; border-radius: 50%; background: #e3f8ff; color: var(--on-accent); font: 700 10px/1 var(--font-mono); letter-spacing: -.03em; box-shadow: 0 0 0 1.5px rgba(4,6,11,.85), 0 0 0 3px var(--accent); }
 .lt-badge.is-home { background: var(--home-grad); color: #eafff5; box-shadow: 0 0 0 1.5px rgba(4,6,11,.85), 0 0 0 3px #23a873; }

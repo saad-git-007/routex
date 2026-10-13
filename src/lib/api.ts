@@ -21,30 +21,21 @@ export const fetchRoads = (prov: Province = 'ab') => get<{ roads: RoadCondition[
 
 // ── Esri World Geocoder (keyless suggest + find) ───────────────────────────────
 const GEO = 'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer'
-// Anywhere in the chosen province, ranked nearest to home (or the chosen city) first.
-const EXTENTS: Record<Province, object> = {
-  ab: { xmin: -120.1, ymin: 48.95, xmax: -109.9, ymax: 60.05 },
-  bc: { xmin: -139.1, ymin: 48.2, xmax: -114.0, ymax: 60.1 },
-  sk: { xmin: -110.1, ymin: 48.9, xmax: -101.3, ymax: 60.1 },
-  mb: { xmin: -102.1, ymin: 48.9, xmax: -88.9, ymax: 60.1 },
-  on: { xmin: -95.2, ymin: 41.6, xmax: -74.3, ymax: 56.9 },
-  atl: { xmin: -69.1, ymin: 43.3, xmax: -52.5, ymax: 60.4 },
-  yt: { xmin: -141.1, ymin: 60.0, xmax: -123.8, ymax: 69.7 },
-}
-let near = '-114.07,51.045', extent: Province = 'ab'
-export const setSearchNear = (lat: number, lon: number, prov: Province = 'ab') => { near = `${lon.toFixed(4)},${lat.toFixed(4)}`; extent = prov }
+// Search across Canada; home (or the chosen city) only biases nearby suggestions.
+let near = '-114.07,51.045'
+export const setSearchNear = (lat: number, lon: number) => { near = `${lon.toFixed(4)},${lat.toFixed(4)}` }
 export type Suggestion = { text: string; magicKey: string }
 
 export async function suggest(text: string, signal?: AbortSignal): Promise<Suggestion[]> {
   const q = new URLSearchParams({
-    f: 'json', text, location: near, searchExtent: JSON.stringify({ ...EXTENTS[extent], spatialReference: { wkid: 4326 } }), countryCode: 'CAN', maxSuggestions: '6',
+    f: 'json', text, location: near, countryCode: 'CAN', maxSuggestions: '6',
     category: 'Address,POI,Postal,Neighborhood,Street Name',
   })
   const r = await get<{ suggestions?: Suggestion[] }>(`${GEO}/suggest?${q}`, signal)
   return (r.suggestions ?? []).filter((s) => !(s as { isCollection?: boolean }).isCollection)
 }
 export async function findPlace(s: Suggestion): Promise<Place | null> {
-  const q = new URLSearchParams({ f: 'json', singleLine: s.text, magicKey: s.magicKey, maxLocations: '1', outFields: 'PlaceName,ShortLabel' })
+  const q = new URLSearchParams({ f: 'json', singleLine: s.text, magicKey: s.magicKey, countryCode: 'CAN', maxLocations: '1', outFields: 'PlaceName,ShortLabel' })
   const r = await get<{ candidates?: { address: string; location: { x: number; y: number }; attributes: { PlaceName?: string; ShortLabel?: string } }[] }>(`${GEO}/findAddressCandidates?${q}`)
   const c = r.candidates?.[0]
   if (!c) return null

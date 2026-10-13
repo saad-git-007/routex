@@ -110,8 +110,8 @@ export default function App() {
   const nearCalgary = !!city && Math.hypot(city.lat - 51.045, (city.lon + 114.07) * 0.63) < 0.6
   const prov: Province = city?.prov ?? 'ab'
   NO_REPORT.text = prov === 'ab' ? 'City street · no 511 road report' : 'No road condition report here'
-  if (home) setSearchNear(home.lat, home.lon, prov)
-  else if (city) setSearchNear(city.lat, city.lon, prov)
+  if (home) setSearchNear(home.lat, home.lon)
+  else if (city) setSearchNear(city.lat, city.lon)
   const pickCity = useCallback((c: City) => {
     setCityKey(c.key); setCityOpen(false)
     if (tourPending.current) { tourPending.current = false; setTourOpen(true) }

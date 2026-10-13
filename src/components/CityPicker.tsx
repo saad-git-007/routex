@@ -66,9 +66,9 @@ function CityPickerView({ open, first, current, onPick, onClose }: {
               <p className="eyebrow">Welcome to RouteX</p>
               <p className="city-lede">See the road before you drive it. Live traffic cameras across Canada, with incidents, closures and road conditions.</p>
               <ul className="city-feats">
-                <li><Icon name="route" size={16} /><span>Plan a trip and see every camera on the way, in driving order.</span></li>
-                <li><Icon name="camera" size={16} /><span>Look around your city in Areas, or save your own camera lists.</span></li>
-                <li><Icon name="alert" size={16} /><span>Check incidents, closures, weather and road conditions before you leave.</span></li>
+                <li><Icon name="camera" size={16} /><span><strong>Preview your drive:</strong> See live traffic cameras along your route, in the order you’ll pass them.</span></li>
+                <li><Icon name="alert" size={16} /><span><strong>Check conditions ahead:</strong> View incidents, closures, road conditions and weather along your trip.</span></li>
+                <li><Icon name="route" size={16} /><span><strong>Route planning:</strong> Add multiple stops and optimize their order to reduce driving distance.</span></li>
               </ul>
             </div>
           )}

@@ -8,6 +8,12 @@
 
 ## What it does
 
+The welcome screen highlights three core features:
+
+- **Preview your drive:** See live traffic cameras along your route, in the order you’ll pass them.
+- **Check conditions ahead:** View incidents, closures, road conditions and weather along your trip.
+- **Route planning:** Add multiple stops and optimize their order to reduce driving distance.
+
 - **Plan a trip.** Set home, add destinations, and RouteX orders the stops for the shortest total distance. Round trip or one way.
 - **Every camera on the way.** City of Calgary cameras, every 511 Alberta camera in the province, the City of Edmonton's live video cameras and the Town of Banff's street cameras within 250 m of the route, listed in the order you'll pass them. Scrolling the list moves along the route on the map.
 - **Road conditions per camera.** Each picture shows the 511 Alberta winter road report for the highway it looks at (bare and dry, bare and wet, partly covered, covered, travel not recommended).

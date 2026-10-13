@@ -63,8 +63,7 @@ function CityPickerView({ open, first, current, onPick, onClose }: {
           {!first && <button type="button" className="btn-icon btn-xs city-close" onClick={() => dlg.current?.close()} aria-label="Close"><Icon name="x" size={16} /></button>}
           {first && (
             <div className="city-intro">
-              <p className="eyebrow">Welcome to RouteX</p>
-              <p className="city-lede">See the road before you drive it. Live traffic cameras across Canada, with incidents, closures and road conditions.</p>
+              <p className="city-welcome">Welcome to RouteX</p>
               <ul className="city-feats">
                 <li><Icon name="camera" size={16} /><span><strong>Preview your drive:</strong> See live traffic cameras along your route, in the order you’ll pass them.</span></li>
                 <li><Icon name="alert" size={16} /><span><strong>Check conditions ahead:</strong> View incidents, closures, road conditions and weather along your trip.</span></li>

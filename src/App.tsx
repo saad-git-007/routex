@@ -28,6 +28,7 @@ import { CameraList } from './components/CameraList'
 import { Icon } from './components/Icon'
 import { MapView, type Basemap } from './components/MapView'
 import { CityPicker } from './components/CityPicker'
+import { AppTour } from './components/AppTour'
 import { CITIES, PROVINCES, cityZoom, type City, type Province } from './lib/cities'
 import { Planner } from './components/Planner'
 import { Segmented } from './components/Segmented'
@@ -101,6 +102,9 @@ export default function App() {
   // The city to look at. Unset means a first visit, which opens the city question.
   const [cityKey, setCityKey] = useStored<string | null>('city', null)
   const [cityOpen, setCityOpen] = useState(cityKey == null)
+  const [tourDone, setTourDone] = useStored('tourDone', false)
+  const tourPending = useRef(cityKey == null && !tourDone)
+  const [tourOpen, setTourOpen] = useState(false)
   const city = CITIES.find((c) => c.key === cityKey)
   // Calgary's community names only make sense for Calgary and the towns around it.
   const nearCalgary = !!city && Math.hypot(city.lat - 51.045, (city.lon + 114.07) * 0.63) < 0.6
@@ -110,6 +114,7 @@ export default function App() {
   else if (city) setSearchNear(city.lat, city.lon, prov)
   const pickCity = useCallback((c: City) => {
     setCityKey(c.key); setCityOpen(false)
+    if (tourPending.current) { tourPending.current = false; setTourOpen(true) }
     setFlyTo({ lat: c.lat, lon: c.lon, zoom: cityZoom(c), n: Date.now() })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const [selEvent, setSelEvent] = useState<string | null>(null)
@@ -494,6 +499,7 @@ export default function App() {
       <ZoomView cam={zoom} onClose={closeZoom} />
       <CityPicker open={cityOpen} first={cityKey == null} current={cityKey} onPick={pickCity}
         onClose={() => { setCityOpen(false); if (cityKey == null) setCityKey('calgary') }} />
+      {tourOpen && <AppTour onFinish={() => { setTourOpen(false); setTourDone(true) }} />}
       <AreaShow open={areasOpen} onClose={closeAreas} cameras={cameras} roads={roads} prov={prov} cityKey={cityKey} area={area} setArea={setArea}
         lists={camLists} setLists={setCamLists} listId={listId} setListId={setListId} onZoom={setZoom} />
       {route && <BeforeILeave open={leaving} onClose={closeLeaving} route={route} cams={routeCams} events={routeEvents as OnRoute<RoadEvent>[]} camRoads={camRoads} weather={weather} level={level} reasons={reasons} allEvents={routeEventsAll} alerts={alerts} onZoom={setZoom} />}

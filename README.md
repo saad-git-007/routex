@@ -22,6 +22,7 @@ The welcome screen highlights three core features:
 - **Weather.** Forecast at home, each stop and along the way (Open-Meteo), plus 511 road weather stations.
 - **Before I leave.** A full-screen, auto-advancing look at every camera on the route, one per screen.
 - **Pick your city.** A short welcome explains the app and offers one search across every Canadian city with cameras (or "Use my location"); the map, search and data follow it.
+- **First-visit tour.** After choosing a city for the first time, a brief guide highlights the trip planner, map tools, Layers, city picker, Areas and route preview, explaining the icons as you go. It adapts to mobile and desktop, supports Back, Next, Skip tour and Escape, and remembers completion or skipping in your browser.
 - **Areas.** Five cameras spread evenly across your city (or one part of Calgary: NW, NE, Core, SW, SE), for a quick overview without a route.
 - **Your own camera lists.** Pick cameras on a map, name the list, and play it back like an area. Lists stay in your browser.
 - **Take it with you.** Save and favourite routes in the browser, open the whole trip in Google Maps with stops in order, download GPX, or share a link that rebuilds the trip.

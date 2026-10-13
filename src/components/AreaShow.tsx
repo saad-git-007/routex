@@ -3,7 +3,8 @@ import { QUADRANTS, areaOf, spread, type Area } from '../lib/areas'
 import { citiesWithCameras, cityOf, cityZoom } from '../lib/cities'
 import { sourceLabel } from '../lib/layers'
 import { roadAt } from '../lib/conditions'
-import { useFrames, useWatch } from '../lib/frames'
+import { useFrames, usePreload, useWatch } from '../lib/frames'
+import { cameraWindow } from '../lib/cameraWindow'
 import type { CamList } from '../lib/lists'
 import type { Camera, RoadCondition } from '../lib/types'
 import { Freshness, RoadNote, Shot } from './CameraCard'
@@ -35,8 +36,8 @@ function CitySelect({ cities, value, onPick, label }: { cities: CityRow[]; value
 
 // Full screen, like Before I leave: five cameras spread across a city (or one part of Calgary), one per screen,
 // or a list of cameras the viewer picked on a map and saved in this browser.
-function AreaShowView({ open, onClose, cameras, roads: abRoads, prov, cityKey, area, setArea, lists, setLists, listId, setListId, onZoom }: {
-  open: boolean; onClose: () => void; cameras: Camera[]; roads: RoadCondition[]; prov: string
+function AreaShowView({ open, paused, onClose, cameras, roads: abRoads, prov, cityKey, area, setArea, lists, setLists, listId, setListId, onZoom }: {
+  open: boolean; paused: boolean; onClose: () => void; cameras: Camera[]; roads: RoadCondition[]; prov: string
   cityKey: string | null; area: Area; setArea: (a: Area) => void
   lists: CamList[]; setLists: (f: (l: CamList[]) => CamList[]) => void; listId: string | null; setListId: (id: string | null) => void
   onZoom: (c: Camera) => void
@@ -100,7 +101,10 @@ function AreaShowView({ open, onClose, cameras, roads: abRoads, prov, cityKey, a
   }
   const jumpQuad = (a: Area) => { const x = QUADRANTS.find((y) => y.key === a)!; setJump({ city: 'calgary', quad: a }); setPickView({ center: x.center, zoom: x.zoom + 0.5, n: Date.now() }) }
 
-  useWatch(open ? (edit ? (focus ? [focus] : []) : cams.map((c) => c.id)) : [])
+  const cameraSet = cameraWindow(cams, open && !paused && !edit ? [i] : [])
+  useWatch(open && !paused && edit ? (focus ? [focus] : []) : cameraSet.visible)
+  usePreload(cameraSet.preload)
+  const loaded = new Set([...cameraSet.visible, ...cameraSet.preload])
 
   const restart = () => { setI(0); setPlaying(!reduced()); scroller.current?.scrollTo({ top: 0 }) }
   useEffect(() => {
@@ -188,7 +192,7 @@ function AreaShowView({ open, onClose, cameras, roads: abRoads, prov, cityKey, a
             <PickMap cameras={cameras} picked={edit.ids} focus={focus} onPick={toggle} view={pickView} pin={pin} />
             {focused && (
               <div className="pick-preview">
-                <Shot id={focused.id} alt={`Latest picture from ${focused.name}`} className="pick-shot" />
+                <Shot id={focused.id} alt={`Latest picture from ${focused.name}`} className="pick-shot" load={!paused} />
                 <div>
                   <h3>{focused.name}</h3>
                   <p>{areaLabel(focused)} · <Freshness id={focused.id} /></p>
@@ -254,7 +258,7 @@ function AreaShowView({ open, onClose, cameras, roads: abRoads, prov, cityKey, a
             {cams.map((c, j) => (
               <section key={c.id} className="bil-slide" data-i={j} aria-label={c.name}>
                 <div className="bil-near" />
-                <button className="bil-zoom" onClick={() => { setPlaying(false); onZoom(c) }} aria-label={`Zoom into ${c.name}`} title="Tap to zoom"><Shot id={c.id} alt={`Latest picture from ${c.name}`} className="bil-shot" /></button>
+                <button className="bil-zoom" onClick={() => { setPlaying(false); onZoom(c) }} aria-label={`Zoom into ${c.name}`} title="Tap to zoom"><Shot id={c.id} alt={`Latest picture from ${c.name}`} className="bil-shot" load={loaded.has(c.id)} refresh={j === i} /></button>
                 <div className="bil-cap">
                   <span className="bil-n tnum">{j + 1}<small>/{cams.length}</small></span>
                   <div>

@@ -5,6 +5,7 @@ import { LiveVideo } from './LiveVideo'
 import type { Camera } from '../lib/types'
 import { Freshness } from './CameraCard'
 import { Icon } from './Icon'
+import { useNow } from '../lib/useNow'
 
 const MAX = 6
 
@@ -23,6 +24,7 @@ function ZoomViewView({ cam, onClose }: { cam: Camera | null; onClose: () => voi
   // Set by the second tap of a double tap; the close happens on its click, so that click can't reach the page behind.
   const closeTap = useRef<{ x: number; y: number } | null>(null)
   const f = useFrame(cam?.id ?? '')
+  const minute = Math.floor(useNow(60000, true) / 60000)
 
   const apply = (animate = false) => {
     const el = img.current, st = stage.current
@@ -109,7 +111,7 @@ function ZoomViewView({ cam, onClose }: { cam: Camera | null; onClose: () => voi
             onClick={(e) => { const c = closeTap.current; closeTap.current = null; if (c && Math.hypot(e.clientX - c.x, e.clientY - c.y) < 12) dlg.current?.close() }}
             onDoubleClick={(e) => { if (Date.now() - openedAt.current < 700) return; const [x, y] = local(e); zoomAt(t.current.s > 1.2 ? 1 : 2.5, x, y, true) }}>
             {isLive(cam.id) ? <LiveVideo id={cam.id} alt={`Live video from ${cam.name}`} className="zoom-live" videoRef={(el) => { img.current = el }} />
-              : (isStill(cam.id) || f?.url) ? <img ref={(el) => { img.current = el }} src={isStill(cam.id) ? directUrl(cam.id, Math.floor(Date.now() / 60e3)) : f!.url} alt={`Latest picture from ${cam.name}`} draggable={false} /> : <div className="shot-loading" />}
+              : (isStill(cam.id) || f?.url) ? <img ref={(el) => { img.current = el }} src={isStill(cam.id) ? directUrl(cam.id, minute) : f!.url} alt={`Latest picture from ${cam.name}`} draggable={false} /> : <div className="shot-loading" />}
           </div>
           <p className="zv-hint"><span className="hint-touch">Pinch to zoom in and out. Double tap to close.</span><span className="hint-mouse">Scroll to zoom in and out · drag to look around · Esc to close</span></p>
         </>

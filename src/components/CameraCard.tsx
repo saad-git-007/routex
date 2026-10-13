@@ -14,18 +14,21 @@ export const STALE_MS = 15 * 60e3
 export const NO_REPORT = { text: 'City street · no 511 road report' }
 
 /** Cross-fades to each new picture so a refresh never flashes empty. */
-export function Shot({ id, alt, className }: { id: string; alt: string; className?: string }) {
+export function Shot({ id, alt, className, load = true, refresh = true }: { id: string; alt: string; className?: string; load?: boolean; refresh?: boolean }) {
+  if (!load) return <div className={`shot ${className ?? ''}`}><div className="shot-loading" /></div>
   if (isLive(id)) return <LiveVideo id={id} alt={alt} className={className} />
-  if (isStill(id)) return <DirectStill id={id} alt={alt} className={className} />
+  if (isStill(id)) return <DirectStill id={id} alt={alt} className={className} refresh={refresh} />
   return <Still id={id} alt={alt} className={className} />
 }
 
 // Banff and Saskatchewan pictures load straight from their source, a fresh copy each minute, cross-fading like the others.
-function DirectStill({ id, alt, className }: { id: string; alt: string; className?: string }) {
-  const minute = Math.floor(useNow(60e3) / 60e3)
+function DirectStill({ id, alt, className, refresh }: { id: string; alt: string; className?: string; refresh: boolean }) {
+  const minute = Math.floor(useNow(60e3, true) / 60e3)
+  const lastMinute = useRef(minute)
+  if (refresh) lastMinute.current = minute
   const [shown, setShown] = useState<string[]>([])
   const [error, setError] = useState(false)
-  const next = directUrl(id, minute)
+  const next = directUrl(id, lastMinute.current)
   return (
     <div className={`shot ${className ?? ''}`}>
       {!shown.length && (error ? <div className="shot-empty"><Icon name="camera" size={22} /><span>No picture</span></div> : <div className="shot-loading" />)}
@@ -86,9 +89,9 @@ export function RoadNote({ road, className = '' }: { road: RoadCondition | null 
 }
 
 // Memoised with id-based callbacks, so scrolling the list (which moves "active") re-renders two cards, not all of them.
-export const CameraCard = memo(function CameraCard({ cam, index, legLabel, road, active, onSelect: select, onZoom: zoom, cardRef: register }: {
+export const CameraCard = memo(function CameraCard({ cam, index, legLabel, road, active, load, refresh, onSelect: select, onZoom: zoom, cardRef: register }: {
   cam: OnRoute<Camera>; index: number; legLabel: string; road: RoadCondition | null | undefined; active: boolean
-  onSelect: (id: string) => void; onZoom: (c: Camera) => void; cardRef?: (id: string, el: HTMLElement | null) => void
+  onSelect: (id: string) => void; onZoom: (c: Camera) => void; cardRef?: (id: string, el: HTMLElement | null) => void; load: boolean; refresh: boolean
 }) {
   const onSelect = () => select(cam.id), onZoom = () => zoom(cam)
   const cardRef = register && ((el: HTMLElement | null) => register(cam.id, el))
@@ -103,7 +106,7 @@ export const CameraCard = memo(function CameraCard({ cam, index, legLabel, road,
     <div className={`magic cam-card ${active ? 'is-active' : ''}`} data-cam={cam.id} ref={cardRef}>
       {active && <span className="card-trace" aria-hidden />}
       <button className="cam-hit" onClick={onSelect} onPointerUp={tap} onDoubleClick={onZoom} aria-label={`Show ${cam.name} on the map`}>
-        <Shot id={cam.id} alt={`Latest picture from ${cam.name}`} />
+        <Shot id={cam.id} alt={`Latest picture from ${cam.name}`} load={load} refresh={refresh} />
         <span className="cam-index tnum">{index + 1}</span>
         <Freshness id={cam.id} />
       </button>

@@ -5,12 +5,14 @@ import type { Alert, Camera, OnRoute, RoadCondition, RoadEvent, Route, Weather }
 import { Freshness, RoadNote, Shot } from './CameraCard'
 import { Icon } from './Icon'
 import { LevelDetails } from './LevelDetails'
+import { cameraWindow } from '../lib/cameraWindow'
+import { usePreload, useWatch } from '../lib/frames'
 
 const DWELL = 5000
 
 // Full-screen, one camera per screen in driving order, auto-advancing. Glance through the whole drive in a minute.
-function BeforeILeaveView({ open, onClose, route, cams, events, camRoads, weather, level, reasons, allEvents, alerts, onZoom }: {
-  open: boolean; onClose: () => void; route: Route; cams: OnRoute<Camera>[]; events: OnRoute<RoadEvent>[]; camRoads: Map<string, RoadCondition | null>
+function BeforeILeaveView({ open, paused, onClose, route, cams, events, camRoads, weather, level, reasons, allEvents, alerts, onZoom }: {
+  open: boolean; paused: boolean; onClose: () => void; route: Route; cams: OnRoute<Camera>[]; events: OnRoute<RoadEvent>[]; camRoads: Map<string, RoadCondition | null>
   weather: Weather[]; level: Level; reasons: string[]; allEvents: OnRoute<RoadEvent>[]; alerts: Alert[]; onZoom: (c: Camera) => void
 }) {
   const dlg = useRef<HTMLDialogElement>(null)
@@ -18,6 +20,10 @@ function BeforeILeaveView({ open, onClose, route, cams, events, camRoads, weathe
   const [i, setI] = useState(0)
   const [playing, setPlaying] = useState(true)
   const [cycle, setCycle] = useState(0)
+  const cameraSet = cameraWindow(cams, open && !paused ? [i] : [])
+  useWatch(cameraSet.visible)
+  usePreload(cameraSet.preload)
+  const loaded = new Set([...cameraSet.visible, ...cameraSet.preload])
 
   useEffect(() => {
     if (open) { dlg.current?.showModal(); requestAnimationFrame(() => scroller.current?.focus({ preventScroll: true })); setI(0); setPlaying(!matchMedia('(prefers-reduced-motion: reduce)').matches); scroller.current?.scrollTo({ top: 0 }) }
@@ -106,7 +112,7 @@ function BeforeILeaveView({ open, onClose, route, cams, events, camRoads, weathe
             {cams.map((c, j) => (
               <section key={c.id} className="bil-slide" data-i={j} aria-label={c.name}>
                 <div className="bil-near" aria-live="polite">{j === i && near.map((e) => <span key={e.id} className={`chip chip-${e.kind}`}><Icon name={e.kind === 'closure' ? 'closure' : 'alert'} size={13} /> {e.title}</span>)}</div>
-                <button className="bil-zoom" onClick={() => { setPlaying(false); onZoom(c) }} aria-label={`Zoom into ${c.name}`} title="Tap to zoom"><Shot id={c.id} alt={`Latest picture from ${c.name}`} className="bil-shot" /></button>
+                <button className="bil-zoom" onClick={() => { setPlaying(false); onZoom(c) }} aria-label={`Zoom into ${c.name}`} title="Tap to zoom"><Shot id={c.id} alt={`Latest picture from ${c.name}`} className="bil-shot" load={loaded.has(c.id)} refresh={j === i} /></button>
                 <div className="bil-cap">
                   <span className="bil-n tnum">{j + 1}<small>/{cams.length}</small></span>
                   <div>

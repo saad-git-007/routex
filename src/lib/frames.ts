@@ -14,6 +14,8 @@ type Snapshot = { frames: Map<string, Frame>; nextAt: number; busy: boolean; las
 let snap: Snapshot = { frames: new Map(), nextAt: Date.now() + PERIOD, busy: false, lastAt: 0 }
 const listeners = new Set<() => void>()
 const watched = new Map<string, number>() // id → watcher count
+const preloaded = new Map<string, number>() // warmed once, never included in minute polling
+const fetching = new Set<string>()
 let timer: number | undefined, kick: number | undefined
 
 const emit = (patch: Partial<Snapshot>) => {
@@ -84,7 +86,9 @@ function decode(b64: string) {
 }
 
 async function poll(ids: string[]) {
+  ids = ids.filter((id) => !fetching.has(id))
   if (!ids.length) return
+  ids.forEach((id) => fetching.add(id))
   emit({ busy: true })
   // Collect what changed and merge it into the latest snapshot at the end: a copy taken now would overwrite pictures
   // that a quicker fetch (for newly watched cameras) publishes while this one is still waiting.
@@ -111,11 +115,14 @@ async function poll(ids: string[]) {
   }
   const merged = new Map(snap.frames)
   frames.forEach((v, k) => merged.set(k, v))
-  emit({ frames: merged, busy: false, lastAt: Date.now() })
+  ids.forEach((id) => fetching.delete(id))
+  emit({ frames: merged, busy: fetching.size > 0, lastAt: Date.now() })
 }
 
 function tick() {
   clearTimeout(timer)
+  timer = undefined
+  if (!watched.size) return
   if (document.visibilityState === 'visible') void poll([...watched.keys()])
   const nextAt = Date.now() + PERIOD
   emit({ nextAt })
@@ -126,21 +133,28 @@ function tick() {
 function fetchNew() {
   clearTimeout(kick)
   kick = window.setTimeout(async () => {
-    const fresh = [...watched.keys()].filter((id) => !snap.frames.has(id))
+    if (document.visibilityState !== 'visible') return
+    const fresh = [...new Set([...watched.keys(), ...preloaded.keys()])].filter((id) => {
+      const frame = snap.frames.get(id)
+      return !frame || Date.now() - frame.checked >= PERIOD
+    })
     // Paint the last stored picture first, so cards never start empty after a reload.
-    const frames = new Map(snap.frames)
+    const frames = new Map<string, Frame>()
     for (const id of fresh) {
       const s = await latestStored(id)
       if (s && !frames.has(id)) frames.set(id, { url: URL.createObjectURL(s.blob), lm: s.lm, checked: 0 })
     }
-    if (fresh.length) emit({ frames })
-    await poll(fresh)
+    const merged = new Map(snap.frames)
+    frames.forEach((frame, id) => { if (!merged.has(id)) merged.set(id, frame) })
+    if (frames.size) emit({ frames: merged })
+    if (document.visibilityState === 'visible') await poll(fresh.filter((id) => watched.has(id) || preloaded.has(id)))
   }, 250)
 }
 
 document.addEventListener('visibilitychange', () => {
   // Back on the tab after a while: refresh now rather than showing old pictures until the next tick.
   if (document.visibilityState === 'visible' && Date.now() - snap.lastAt > PERIOD) tick()
+  if (document.visibilityState === 'visible') fetchNew()
 })
 
 export function watch(all: string[]) {
@@ -158,6 +172,20 @@ export function watch(all: string[]) {
   }
 }
 
+export function preload(all: string[]) {
+  const ids = all.filter((id) => !isDirect(id))
+  ids.forEach((id) => preloaded.set(id, (preloaded.get(id) ?? 0) + 1))
+  fetchNew()
+  return () => {
+    ids.forEach((id) => {
+      const n = (preloaded.get(id) ?? 1) - 1
+      if (n <= 0) preloaded.delete(id)
+      else preloaded.set(id, n)
+    })
+    scheduleSweep()
+  }
+}
+
 // Pictures of cameras nobody has looked at for two minutes are let go (each holds an image in memory); the last one
 // stays in IndexedDB, so coming back to them still paints at once.
 let sweep: number | undefined
@@ -167,7 +195,7 @@ function scheduleSweep() {
     let dropped = false
     const frames = new Map(snap.frames)
     for (const [id, f] of frames) {
-      if (watched.has(id)) continue
+      if (watched.has(id) || preloaded.has(id)) continue
       if (f.url) URL.revokeObjectURL(f.url)
       frames.delete(id); dropped = true
     }
@@ -186,4 +214,8 @@ export function useFrame(id: string | undefined) {
 export function useWatch(ids: string[]) {
   const key = ids.join(',')
   useEffect(() => (key ? watch(key.split(',')) : undefined), [key])
+}
+export function usePreload(ids: string[]) {
+  const key = ids.join(',')
+  useEffect(() => (key ? preload(key.split(',')) : undefined), [key])
 }

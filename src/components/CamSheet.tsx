@@ -6,9 +6,9 @@ import { Icon } from './Icon'
 
 // A swipe-up panel for one camera: the picture shows at once; drag up for a bigger view, down to close.
 // Drag thresholds after vaul (MIT, Emil Kowalski) and beUI bottom-sheet (MIT, Saurabh Chauhan).
-export function CamSheet({ cam, index, total, meta, road, onPrev, onNext, onClose, onZoom }: {
+export function CamSheet({ cam, index, total, meta, road, onPrev, onNext, onClose, onZoom, load }: {
   cam: Camera; index: number | null; total: number; meta: string; road: RoadCondition | null
-  onPrev?: () => void; onNext?: () => void; onClose: () => void; onZoom: () => void
+  onPrev?: () => void; onNext?: () => void; onClose: () => void; onZoom: () => void; load: boolean
 }) {
   const [big, setBig] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -47,7 +47,7 @@ export function CamSheet({ cam, index, total, meta, road, onPrev, onNext, onClos
         <button className="btn-icon btn-xs" onClick={onClose} aria-label="Close"><Icon name="x" size={16} /></button>
       </div>
       <div className="camsheet-pic" role="button" tabIndex={0} aria-label="Zoom into the picture" title="Tap to zoom" onClick={onZoom} onKeyDown={(e) => e.key === 'Enter' && onZoom()}>
-        <Shot id={cam.id} alt={`Latest picture from ${cam.name}`} className="camsheet-shot" />
+        <Shot id={cam.id} alt={`Latest picture from ${cam.name}`} className="camsheet-shot" load={load} />
         <Freshness id={cam.id} />
       </div>
       <RoadNote road={road} className="camsheet-road" />

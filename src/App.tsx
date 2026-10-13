@@ -206,8 +206,8 @@ export default function App() {
   // The 511 report for the road each route camera shows (null on city streets).
   const camRoads = useMemo(() => new Map(routeCamsAll.map((c) => [c.id, roadAt(c, roads)])), [routeCamsAll, roads])
 
-  useWatch(routeCams.map((c) => c.id))
-  useWatch(sheet ? [sheet] : [])
+  useWatch(sheet && !zoom && !leaving && !areasOpen && !cityOpen && !tourOpen ? [sheet] : [])
+  useWatch(zoom ? [zoom.id] : [])
 
   // ── weather at home, each stop and every ~15 km between ──
   const wxPoints = useMemo(() => {
@@ -417,6 +417,7 @@ export default function App() {
           <AnimatePresence>{sheetCam && (
             <CamSheet
               key="sheet"
+              load={!zoom && !leaving && !areasOpen && !cityOpen && !tourOpen}
               cam={sheetCam}
               road={camRoads.get(sheetCam.id) ?? roadAt(sheetCam, roads)}
               index={sheetIdx >= 0 ? sheetIdx : null}
@@ -491,7 +492,7 @@ export default function App() {
               </div>
 
               {tab === 'cameras' && (routeCams.length ? (
-                <CameraList cams={routeCams} route={route} roads={camRoads} active={active} setActive={setActive} scrollTo={scrollTo} onZoom={setZoom} />
+                <CameraList cams={routeCams} route={route} roads={camRoads} active={active} setActive={setActive} scrollTo={scrollTo} onZoom={setZoom} enabled={!full && !leaving && !areasOpen && !zoom && !cityOpen && !tourOpen} />
               ) : (
                 <div className="quiet"><Icon name="camera" size={20} /><p>{routeCamsAll.length ? 'Every camera on this route is in a layer that is switched off. Turn it on above or in Layers on the map.' : `No cameras within ${CAM_RADIUS} m of this route.`}</p></div>
               ))}
@@ -507,9 +508,9 @@ export default function App() {
       <CityPicker open={cityOpen} first={cityKey == null} current={cityKey} onPick={pickCity}
         onClose={() => { setCityOpen(false); if (cityKey == null) setCityKey('calgary') }} />
       {tourOpen && <AppTour onFinish={() => { setTourOpen(false); setTourDone(true) }} />}
-      <AreaShow open={areasOpen} onClose={closeAreas} cameras={cameras} roads={roads} prov={prov} cityKey={cityKey} area={area} setArea={setArea}
+      <AreaShow open={areasOpen} paused={!!zoom} onClose={closeAreas} cameras={cameras} roads={roads} prov={prov} cityKey={cityKey} area={area} setArea={setArea}
         lists={camLists} setLists={setCamLists} listId={listId} setListId={setListId} onZoom={setZoom} />
-      {route && <BeforeILeave open={leaving} onClose={closeLeaving} route={route} cams={routeCams} events={routeEvents as OnRoute<RoadEvent>[]} camRoads={camRoads} weather={weather} level={level} reasons={reasons} allEvents={routeEventsAll} alerts={alerts} onZoom={setZoom} />}
+      {route && <BeforeILeave open={leaving} paused={!!zoom} onClose={closeLeaving} route={route} cams={routeCams} events={routeEvents as OnRoute<RoadEvent>[]} camRoads={camRoads} weather={weather} level={level} reasons={reasons} allEvents={routeEventsAll} alerts={alerts} onZoom={setZoom} />}
     </div>
   )
 }

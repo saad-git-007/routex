@@ -1,15 +1,48 @@
-import { memo, useCallback, useEffect, useRef } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { cameraWindow } from '../lib/cameraWindow'
+import { usePreload, useWatch } from '../lib/frames'
 import type { Camera, OnRoute, RoadCondition, Route } from '../lib/types'
 import { CameraCard } from './CameraCard'
 
 // Route cameras in driving order. Scrolling the list "drives" the map: the card crossing the middle of the
 // screen becomes active, its marker pings and the route lights up to it.
-function CameraListView({ cams, route, roads, active, setActive, scrollTo, onZoom }: {
+function CameraListView({ cams, route, roads, active, setActive, scrollTo, onZoom, enabled }: {
   cams: OnRoute<Camera>[]; route: Route; roads: Map<string, RoadCondition | null>; active: string | null; setActive: (id: string) => void
-  scrollTo: { id: string; n: number } | null; onZoom: (c: Camera) => void
+  scrollTo: { id: string; n: number } | null; onZoom: (c: Camera) => void; enabled: boolean
 }) {
   const nodes = useRef(new Map<string, HTMLElement>())
   const quietUntil = useRef(0)
+  const [visible, setVisible] = useState<number[]>([])
+  const cameraSet = cameraWindow(cams, enabled ? visible : [])
+  useWatch(cameraSet.visible)
+  usePreload(cameraSet.preload)
+  const loaded = new Set([...cameraSet.visible, ...cameraSet.preload])
+
+  useEffect(() => {
+    if (!enabled) { setVisible([]); return }
+    let observer: IntersectionObserver
+    const observe = () => {
+      observer?.disconnect()
+      const panel = document.querySelector<HTMLElement>('.panel')
+      const root = panel && getComputedStyle(panel).overflowY === 'auto' ? panel : null
+      const map = document.querySelector<HTMLElement>('.map-col')
+      const top = !root && map && getComputedStyle(map).position === 'sticky' ? map.getBoundingClientRect().bottom : 0
+      const shown = new Set<number>()
+      setVisible([])
+      observer = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          const index = cams.findIndex((c) => c.id === (entry.target as HTMLElement).dataset.cam)
+          if (entry.isIntersecting) shown.add(index)
+          else shown.delete(index)
+        }
+        setVisible([...shown].sort((a, b) => a - b))
+      }, { root, rootMargin: `-${Math.max(0, top)}px 0px 0px 0px`, threshold: 0 })
+      nodes.current.forEach((node) => observer.observe(node))
+    }
+    observe()
+    window.addEventListener('resize', observe)
+    return () => { observer.disconnect(); window.removeEventListener('resize', observe) }
+  }, [cams, enabled])
 
   useEffect(() => {
     const io = new IntersectionObserver((entries) => {
@@ -44,7 +77,7 @@ function CameraListView({ cams, route, roads, active, setActive, scrollTo, onZoo
     <ol className="cam-list">
       {cams.map((c, i) => (
         <li key={c.id}>
-          <CameraCard cam={c} index={i} active={c.id === active} legLabel={legLabel(c.leg)} road={roads.get(c.id)} cardRef={register} onSelect={select} onZoom={onZoom} />
+          <CameraCard cam={c} index={i} active={c.id === active} load={loaded.has(c.id)} refresh={cameraSet.visible.includes(c.id)} legLabel={legLabel(c.leg)} road={roads.get(c.id)} cardRef={register} onSelect={select} onZoom={onZoom} />
         </li>
       ))}
     </ol>

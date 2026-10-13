@@ -4,33 +4,33 @@ import { Icon, type IconName } from './Icon'
 const STEPS: { target: string; title: string; intro: string; icons: [IconName, string][] }[] = [
   {
     target: '.planner-home', title: 'Plan your trip',
-    intro: 'Set home and add stops. Optimize route can reorder them to reduce driving distance.',
-    icons: [['home', 'Your starting point.'], ['star', 'Save a place for another trip.']],
+    intro: 'Set home, add stops and optimize their order.',
+    icons: [['home', 'Starting point'], ['star', 'Save a place']],
   },
   {
     target: '.map-stack', title: 'Explore the map',
-    intro: 'Tap a camera marker to see its live view. Drag to look around, and zoom in for a closer look.',
-    icons: [['locate', 'The location icon shows where you are.'], ['full', 'The corner icon opens the map full screen.']],
+    intro: 'Tap a camera for its live view. Drag or zoom to explore.',
+    icons: [['locate', 'Show my location'], ['full', 'Full-screen map']],
   },
   {
-    target: '.layers-toggle', title: 'Choose what the map shows',
-    intro: 'Open Layers to switch between satellite and street maps, and choose which cameras and road information appear.',
-    icons: [['layers', 'Stacked layers open the map filters.'], ['alert', 'Road markers show incidents, closures and construction where available.']],
+    target: '.layers-toggle', title: 'Map layers',
+    intro: 'Choose satellite or streets, cameras and road information.',
+    icons: [['layers', 'Map filters'], ['alert', 'Incidents, closures & construction']],
   },
   {
-    target: '.btn-city', title: 'Switch cities anytime',
-    intro: 'Your selected city sets the area you’re exploring. Search for another city whenever you want a different view.',
-    icons: [['pin', 'The pin beside the city name opens the city picker.']],
+    target: '.btn-city', title: 'Switch cities',
+    intro: 'Search for another city to explore.',
+    icons: [['pin', 'Choose a city']],
   },
   {
-    target: '.btn-areas', title: 'Take a quick look around',
-    intro: 'Areas gives you a camera overview of your city without planning a trip. You can also build your own camera lists here.',
-    icons: [['cctv', 'The CCTV icon opens Areas and your camera lists.']],
+    target: '.btn-areas', title: 'Explore Areas',
+    intro: 'Browse city cameras or create a camera list. No route needed.',
+    icons: [['cctv', 'Areas & camera lists']],
   },
   {
-    target: '.btn-leave', title: 'Preview before you leave',
-    intro: 'Once your route has cameras, this button plays a full-screen preview in driving order. It becomes available after you plan a trip.',
-    icons: [['play', 'The play icon starts your route’s camera preview.'], ['cloud', 'Your trip panel also has Cameras, Alerts and Weather tabs.']],
+    target: '.btn-leave', title: 'Preview your drive',
+    intro: 'Plan a route with cameras to unlock a preview in driving order.',
+    icons: [['play', 'Play route cameras'], ['cloud', 'Weather in the trip panel']],
   },
 ]
 

@@ -16,7 +16,7 @@ The welcome screen highlights three core features:
 
 - **Plan a trip.** Set home, add destinations, and RouteX orders the stops for the shortest total distance. Round trip or one way.
 - **Search addresses across Canada.** Nearby suggestions are prioritized around home or your selected city. Include the destination city to find an address in another province, such as a Toronto stop while planning from Calgary.
-- **Every camera on the way.** City of Calgary cameras, every 511 Alberta camera in the province, the City of Edmonton's live video cameras and the Town of Banff's street cameras within 250 m of the route, listed in the order you'll pass them. Scrolling the list moves along the route on the map.
+- **Cameras along the way.** Cameras within 250 m of the route appear in driving order. Routes with more than 40 visible cameras show a selection of 40, keeping the first and last available cameras and filling the largest gaps by driving distance. The same selection powers the numbered map markers, camera list and full-screen preview; off-route cameras remain available through Layers. Scrolling the list moves along the route on the map.
 - **Road conditions per camera.** Each picture shows the 511 Alberta winter road report for the highway it looks at (bare and dry, bare and wet, partly covered, covered, travel not recommended).
 - **Incidents, closures and construction.** From the City of Calgary and 511 Alberta, filtered to your route, with a route-level Clear / Caution / Heavy summary.
 - **Conditions along the route.** A strip showing each highway stretch's condition by kilometre, plus colour bands on the map.

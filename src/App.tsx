@@ -8,6 +8,7 @@ import { ripple } from './lib/ripple'
 import { useLiveLocation } from './lib/useLocation'
 import type { CamList } from './lib/lists'
 import { useStored } from './lib/store'
+import { selectRouteCameras } from './lib/routeCameras'
 import { useWtaRoads, type View } from './lib/wta'
 import { useBump } from './lib/useSeen'
 import { AnimatePresence } from 'motion/react'
@@ -187,12 +188,14 @@ export default function App() {
   const routeEventsAll = useMemo(() => (route ? onRoute(route, events, CAM_RADIUS) : []), [route, events])
   const routeEventIds = useMemo(() => new Set(routeEventsAll.map((e) => e.id)), [routeEventsAll])
   // What's shown follows the layer switches.
-  const routeCams = useMemo(() => routeCamsAll.filter((c) => vis[c.src]), [routeCamsAll, vis.city, vis.ab, vis.town]) // eslint-disable-line react-hooks/exhaustive-deps
+  const routeCamsVisible = useMemo(() => routeCamsAll.filter((c) => vis[c.src]), [routeCamsAll, vis.city, vis.ab, vis.town]) // eslint-disable-line react-hooks/exhaustive-deps
+  const routeCams = useMemo(() => selectRouteCameras(routeCamsVisible), [routeCamsVisible])
+  const routeCamIds = useMemo(() => new Set(routeCamsAll.map((c) => c.id)), [routeCamsAll])
   // Cameras on the route that a switched-off layer hides, by layer, so the planner can say why and offer to show them.
   const hiddenCams = (['city', 'ab', 'town'] as const).map((k) => ({ k, n: routeCamsAll.filter((c) => c.src === k && !vis[k]).length })).filter((x) => x.n)
   const routeEvents = useMemo(() => routeEventsAll.filter((e) => vis[e.kind]), [routeEventsAll, vis.incident, vis.closure, vis.construction]) // eslint-disable-line react-hooks/exhaustive-deps
   const mapEvents = useMemo(() => events.filter((e) => vis[e.kind]), [events, vis.incident, vis.closure, vis.construction]) // eslint-disable-line react-hooks/exhaustive-deps
-  const mapCameras = useMemo(() => (route && !vis.others ? [] : cameras.filter((c) => vis[c.src])), [cameras, route, vis.others, vis.city, vis.ab, vis.town]) // eslint-disable-line react-hooks/exhaustive-deps
+  const mapCameras = useMemo(() => (route && !vis.others ? [] : cameras.filter((c) => vis[c.src] && !routeCamIds.has(c.id))), [cameras, route, routeCamIds, vis.others, vis.city, vis.ab, vis.town]) // eslint-disable-line react-hooks/exhaustive-deps
   // Keyed 511 data has each segment's shape: match by location. Otherwise fall back to the highway numbers the route uses.
   const routeRoads = useMemo(() => (route ? roads.filter((r) => (r.line?.length ? overlaps(route, r.line) : route.highways.some((h) => h.toUpperCase() === r.hwy.toUpperCase()))) : []), [route, roads])
   const routeStations = useMemo(() => {
@@ -446,6 +449,10 @@ export default function App() {
                 <div className={`stat ${alertCount ? 'is-alert' : ''}`}><strong><NumberTicker value={alertCount} /></strong><span>alerts</span></div>
               </div>
 
+              {routeCamsVisible.length > routeCams.length && (
+                <p className="hint" role="status">Showing {routeCams.length} of {routeCamsVisible.length} cameras, spaced along your route.</p>
+              )}
+
               {hiddenCams.length > 0 && (
                 <div className="hidden-cams" role="status">
                   <Icon name="layers" size={16} />
@@ -462,7 +469,7 @@ export default function App() {
             <section className="empty card">
               <DotPattern className="empty-dots" />
               <h1>See the road <em>before you drive it</em></h1>
-              <p>Set home and where you're going to get every traffic camera on the way, plus incidents, closures, highway conditions and weather.</p>
+              <p>Set home and where you're going to see traffic cameras along the way, plus incidents, closures, highway conditions and weather.</p>
               <ol className="steps">
                 <li><b>1</b>Set home</li>
                 <li><b>2</b>Add destinations</li>

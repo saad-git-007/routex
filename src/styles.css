@@ -295,14 +295,6 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 
 /* ── Map ── */
 .maplibregl-map { font: inherit; background: #2d3029; }
-.leaflet-container { font: inherit; background: #2d3029; }
-.tiles-imagery { opacity: .82; }
-.leaflet-tile-pane { background: #000; }
-.leaflet-control-zoom { border: 0 !important; box-shadow: var(--elev-2) !important; border-radius: var(--r-md) !important; overflow: hidden; }
-.leaflet-control-zoom a { width: 36px !important; height: 36px !important; line-height: 34px !important; background: var(--surface-2) !important; color: var(--text) !important; border-color: var(--line-subtle) !important; }
-.leaflet-control-zoom a:hover { background: var(--surface-3) !important; }
-.leaflet-tooltip.tip::before { display: none; }
-.leaflet-tooltip.tip { border: 0; }
 .maplibregl-ctrl-group { border: 0 !important; box-shadow: var(--elev-2) !important; border-radius: var(--r-md) !important; overflow: hidden; background: var(--surface-2) !important; }
 .maplibregl-ctrl-group button { width: 36px !important; height: 36px !important; background-color: var(--surface-2) !important; border-color: var(--line-subtle) !important; }
 .maplibregl-ctrl-group button:hover { background-color: var(--surface-3) !important; }

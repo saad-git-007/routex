@@ -39,6 +39,8 @@ export function PickMap({ cameras, picked, focus, onPick, view, pin }: {
     m.on('style.load', () => {
       m.addSource('pick', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       m.addLayer({ id: 'pick', type: 'circle', source: 'pick', paint: {
+        // Same size on screen however far away the tilted map puts a camera.
+        'circle-pitch-scale': 'viewport',
         'circle-radius': ['case', ['==', ['get', 'focus'], 1], 9, 6], 'circle-color': ['get', 'color'],
         'circle-stroke-width': ['case', ['==', ['get', 'focus'], 1], 3, 1.5], 'circle-stroke-color': ['case', ['==', ['get', 'focus'], 1], '#fff', 'rgba(0,0,0,.7)'],
       } })

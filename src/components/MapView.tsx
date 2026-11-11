@@ -53,7 +53,7 @@ function addOverlays(m: maplibregl.Map, data: Record<SourceId, FC>, basemap: Bas
     { id: 'rx-comm', type: 'line', source: 'rx-comm', paint: { 'line-color': streets ? '#5b4bd6' : '#ffffff', 'line-opacity': streets ? 0.55 : 0.6, 'line-width': 1.2, 'line-dasharray': [4, 3] } },
     { id: 'rx-allroads', type: 'line', source: 'rx-allroads', layout: { 'line-cap': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'w'], 'line-opacity': 0.9 } },
     { id: 'rx-roads', type: 'line', source: 'rx-roads', layout: { 'line-cap': 'butt', 'line-join': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': 20, 'line-opacity': 0.75 } },
-    { id: 'rx-cams', type: 'circle', source: 'rx-cams', paint: { 'circle-radius': 4, 'circle-color': ['get', 'color'], 'circle-opacity': 0.9, 'circle-stroke-width': 1.5, 'circle-stroke-color': 'rgba(0,0,0,.7)' } },
+    { id: 'rx-cams', type: 'circle', source: 'rx-cams', paint: { 'circle-pitch-scale': 'viewport', 'circle-radius': 4, 'circle-color': ['get', 'color'], 'circle-opacity': 0.9, 'circle-stroke-width': 1.5, 'circle-stroke-color': 'rgba(0,0,0,.7)' } },
     // Community names: neighbourhoods from city zoom, industrial areas and parks closer in. Names that would overlap
     // a more important one are dropped by MapLibre's label placement.
     { id: 'rx-comm-labels', type: 'symbol', source: 'rx-comm-labels', filter: ['any', ['==', ['get', 'kind'], 'home'], ['>=', ['zoom'], toGL(11.5)]], minzoom: toGL(10.5),

@@ -500,7 +500,7 @@ export default function App() {
               {tab === 'weather' && <WeatherPanel weather={weather} stations={routeStations} />}
             </>
           )}
-          <footer className="foot">Cameras: city traffic departments, provincial 511 services and DriveBC · Routing: OSRM · Weather: Open-Meteo · Maps: Esri, HERE, Garmin, OpenStreetMap contributors · Imagery: Esri, Maxar, Earthstar Geographics</footer>
+          <footer className="foot">Cameras: city traffic departments, provincial 511 services and DriveBC · Routing: OSRM · Weather: Open-Meteo · Map: <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a>, data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · Imagery: Esri, Maxar, Earthstar Geographics; labels: Esri, HERE, Garmin</footer>
         </aside>
       </main>
 

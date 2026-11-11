@@ -5,5 +5,6 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: { proxy: { '/api': 'http://localhost:8788' } },
-  build: { target: 'es2022', chunkSizeWarningLimit: 900 },
+  // MapLibre is large and changes rarely: its own chunk stays cached across app releases.
+  build: { target: 'es2022', chunkSizeWarningLimit: 1100, rollupOptions: { output: { manualChunks: { maplibre: ['maplibre-gl'] } } } },
 })

@@ -1,5 +1,5 @@
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import maplibregl, { type GeoJSONSource, type LngLatLike, type StyleSpecification } from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { reverse } from '../lib/api'
@@ -9,27 +9,31 @@ import { GRADE_COLOR, roadGrade } from '../lib/conditions'
 import type { Fix } from '../lib/useLocation'
 
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services'
-const CALGARY: L.LatLngTuple = [51.045, -114.07]
+const LIBERTY = 'https://tiles.openfreemap.org/styles/liberty'
+const GLYPHS = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf'
+const CALGARY = { lat: 51.045, lon: -114.07 }
 export type Basemap = 'sat' | 'streets'
 
-// Each basemap: a coarse copy underneath (so loading tiles show blurred map, not a blank; only up to zoom 13, as
-// stretching it further cost a fifth of every pan frame), the base, and overlays.
-function basemapLayers(b: Basemap) {
-  const common = { updateWhenZooming: false, keepBuffer: 4, maxZoom: 19 }
-  if (b === 'streets') {
-    const url = `${ESRI}/World_Street_Map/MapServer/tile/{z}/{y}/{x}`
-    return [
-      L.tileLayer(url, { maxNativeZoom: 10, maxZoom: 13, keepBuffer: 4, zIndex: 0, className: 'tiles-under' }),
-      L.tileLayer(url, { ...common, zIndex: 1, className: 'tiles-streets', attribution: 'Map © Esri, HERE, Garmin, OpenStreetMap contributors' }),
-    ]
-  }
-  const url = `${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`
-  return [
-    L.tileLayer(url, { maxNativeZoom: 10, maxZoom: 13, keepBuffer: 4, zIndex: 0, className: 'tiles-under' }),
-    L.tileLayer(url, { ...common, zIndex: 1, className: 'tiles-imagery', attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' }),
-    L.tileLayer(`${ESRI}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`, { ...common, zIndex: 2, className: 'tiles-roads' }),
-    L.tileLayer(`${ESRI}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, { ...common, zIndex: 3 }),
-  ]
+// The app speaks Leaflet zoom levels (256 px tiles); MapLibre's 512 px tiles sit one level lower.
+const toGL = (z: number) => z - 1
+const fromGL = (z: number) => z + 1
+
+// Satellite: Esri imagery with its road and place-name overlays. Streets: OpenFreeMap Liberty, whose building-3d
+// layer stands the buildings up once the map is tilted.
+const SAT: StyleSpecification = {
+  version: 8,
+  glyphs: GLYPHS,
+  sources: {
+    imagery: { type: 'raster', tiles: [`${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`], tileSize: 256, maxzoom: 19 },
+    roads: { type: 'raster', tiles: [`${ESRI}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`], tileSize: 256, maxzoom: 19 },
+    places: { type: 'raster', tiles: [`${ESRI}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`], tileSize: 256, maxzoom: 19 },
+  },
+  layers: [
+    { id: 'bg', type: 'background', paint: { 'background-color': '#000' } },
+    { id: 'imagery', type: 'raster', source: 'imagery', paint: { 'raster-opacity': 0.82, 'raster-fade-duration': 0 } },
+    { id: 'roads', type: 'raster', source: 'roads', paint: { 'raster-fade-duration': 0 } },
+    { id: 'places', type: 'raster', source: 'places', paint: { 'raster-fade-duration': 0 } },
+  ],
 }
 
 type Props = {
@@ -49,281 +53,300 @@ type Props = {
 
 const EVENT_GLYPH: Record<RoadEvent['kind'], string> = { incident: '!', closure: '⨯', construction: '▲' }
 
+type FC = GeoJSON.FeatureCollection
+const EMPTY: FC = { type: 'FeatureCollection', features: [] }
+const ll = (p: [number, number]): [number, number] => [p[1], p[0]] // [lat, lon] → [lon, lat]
+const lineFC = (pts: [number, number][], props = {}): FC => ({ type: 'FeatureCollection', features: pts.length > 1 ? [{ type: 'Feature', properties: props, geometry: { type: 'LineString', coordinates: pts.map(ll) } }] : [] })
+// A circle of r metres as a polygon (the accuracy ring).
+const circle = (lat: number, lon: number, r: number): FC => {
+  const dLat = r / 111320, dLon = r / (111320 * Math.cos((lat * Math.PI) / 180))
+  const ring = Array.from({ length: 49 }, (_, i) => { const a = (i / 48) * 2 * Math.PI; return [lon + dLon * Math.cos(a), lat + dLat * Math.sin(a)] })
+  return { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ring] } }] }
+}
+
+// Every overlay is a GeoJSON source the app owns. Switching basemap replaces the style, so they are re-added on each
+// style load from the last data given.
+const SOURCES = ['rx-comm', 'rx-comm-labels', 'rx-allroads', 'rx-roads', 'rx-cams', 'rx-route', 'rx-progress', 'rx-driven', 'rx-acc'] as const
+type SourceId = typeof SOURCES[number]
+
+function addOverlays(m: maplibregl.Map, data: Record<SourceId, FC>, basemap: Basemap) {
+  for (const id of SOURCES) if (!m.getSource(id)) m.addSource(id, { type: 'geojson', data: data[id] })
+  const streets = basemap === 'streets'
+  const round = { 'line-join': 'round', 'line-cap': 'round' } as const
+  const layers: maplibregl.AddLayerObject[] = [
+    { id: 'rx-comm', type: 'line', source: 'rx-comm', paint: { 'line-color': streets ? '#5b4bd6' : '#ffffff', 'line-opacity': streets ? 0.55 : 0.6, 'line-width': 1.2, 'line-dasharray': [4, 3] } },
+    { id: 'rx-allroads', type: 'line', source: 'rx-allroads', layout: { 'line-cap': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'w'], 'line-opacity': 0.9 } },
+    { id: 'rx-roads', type: 'line', source: 'rx-roads', layout: { 'line-cap': 'butt', 'line-join': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': 20, 'line-opacity': 0.75 } },
+    { id: 'rx-cams', type: 'circle', source: 'rx-cams', paint: { 'circle-radius': 4, 'circle-color': ['get', 'color'], 'circle-opacity': 0.9, 'circle-stroke-width': 1.5, 'circle-stroke-color': 'rgba(0,0,0,.7)' } },
+    // Community names: neighbourhoods from city zoom, industrial areas and parks closer in. Names that would overlap
+    // a more important one are dropped by MapLibre's label placement.
+    { id: 'rx-comm-labels', type: 'symbol', source: 'rx-comm-labels', filter: ['any', ['==', ['get', 'kind'], 'home'], ['>=', ['zoom'], toGL(11.5)]], minzoom: toGL(10.5),
+      layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Bold'], 'text-transform': 'uppercase', 'text-letter-spacing': 0.07, 'symbol-sort-key': ['get', 'rank'], 'text-padding': 4,
+        'text-size': ['step', ['zoom'], 8.5, toGL(11.5), 10, toGL(13), 12] },
+      paint: streets
+        ? { 'text-color': ['case', ['==', ['get', 'kind'], 'home'], '#3f31b8', '#6a6290'], 'text-halo-color': '#fff', 'text-halo-width': 1.5 }
+        : { 'text-color': ['case', ['==', ['get', 'kind'], 'home'], '#fff', 'rgba(255,255,255,.78)'], 'text-halo-color': 'rgba(0,0,0,.85)', 'text-halo-width': 1.5, 'text-halo-blur': 1 } },
+    { id: 'rx-route-glow', type: 'line', source: 'rx-route', layout: round, paint: { 'line-color': '#4cc9f0', 'line-opacity': 0.2, 'line-width': 18 } },
+    { id: 'rx-route-case', type: 'line', source: 'rx-route', layout: round, paint: { 'line-color': '#000', 'line-opacity': 0.6, 'line-width': 9 } },
+    { id: 'rx-route', type: 'line', source: 'rx-route', layout: round, paint: { 'line-color': '#5fd4f5', 'line-width': 5 } },
+    { id: 'rx-progress-glow', type: 'line', source: 'rx-progress', layout: round, paint: { 'line-color': '#e3f8ff', 'line-opacity': 0.22, 'line-width': 14 } },
+    { id: 'rx-progress', type: 'line', source: 'rx-progress', layout: round, paint: { 'line-color': '#e3f8ff', 'line-width': 4 } },
+    { id: 'rx-driven', type: 'line', source: 'rx-driven', layout: round, paint: { 'line-color': '#5b6577', 'line-opacity': 0.95, 'line-width': 7 } },
+    { id: 'rx-acc', type: 'fill', source: 'rx-acc', paint: { 'fill-color': '#3b9bff', 'fill-opacity': 0.12, 'fill-outline-color': 'rgba(59,155,255,.5)' } },
+  ]
+  for (const l of layers) if (!m.getLayer(l.id)) m.addLayer(l)
+}
+
+// A DOM marker like Leaflet's divIcon: a sized element with a class and inner HTML.
+function marker(cls: string, html: string, size: number, z = 0) {
+  const el = document.createElement('div')
+  el.className = cls
+  el.innerHTML = html
+  Object.assign(el.style, { width: `${size}px`, height: `${size}px`, zIndex: String(z) })
+  return el
+}
+
 export function MapView(p: Props) {
   // Within 300 km of the chosen city (or no city chosen): the map may follow home and the trip there.
   const nearStart = (q: { lat: number; lon: number } | null | undefined) =>
     !!q && (!p.start || Math.hypot(q.lat - p.start.lat, (q.lon - p.start.lon) * Math.cos((q.lat * Math.PI) / 180)) * 111 < 300)
   const el = useRef<HTMLDivElement>(null)
-  const map = useRef<L.Map>()
+  const map = useRef<maplibregl.Map>()
   const [stackEl, setStackEl] = useState<HTMLElement | null>(null)
-  const layers = useRef<Record<string, L.LayerGroup>>({})
-  const camMarkers = useRef(new Map<string, L.Marker>())
-  const progress = useRef<{ line: L.Polyline; glow: L.Polyline; car: L.Marker } | null>(null)
-  const me = useRef<{ dot: L.Marker; acc: L.Circle } | null>(null)
+  const data = useRef(Object.fromEntries(SOURCES.map((s) => [s, EMPTY])) as Record<SourceId, FC>)
+  const markers = useRef<Record<string, maplibregl.Marker[]>>({})
+  const camMarkers = useRef(new Map<string, maplibregl.Marker>())
+  const car = useRef<maplibregl.Marker | null>(null)
+  const me = useRef<maplibregl.Marker | null>(null)
+  const tip = useRef<maplibregl.Popup>()
+  const basemap = useRef(p.basemap)
   const cb = useRef(p)
-  // Canvases are made once and reused (a new L.canvas() per rebuild left old ones on the map, each redrawn on every
-  // move, and the top one swallowed taps meant for the camera dots under it). Everything you can tap or hover — quiet
-  // camera dots, highway conditions, route condition halos — shares the one overlay canvas so hits always land.
-  const canvases = useRef<Record<string, L.Canvas>>({})
-  const canvasFor = (k: string) => (canvases.current[k] ??= L.canvas({ padding: 0.15 }))
-  // The live location circle and the driven line change with every fix: SVG updates one shape, a canvas redraws all.
-  const liveSvg = useRef<L.SVG | null>(null)
-  const svgLive = () => (liveSvg.current ??= L.svg({ pane: 'driven', padding: 0.15 }))
   cb.current = p
 
-  // Hide community names that would overlap a bigger community's name. Neighbourhoods come before
-  // industrial areas and parks, then shorter names first so more of them fit.
-  const declutter = () => {
-    const labels = [...(el.current?.querySelectorAll<HTMLElement>('.mk-comm') ?? [])]
-    labels.forEach((n) => n.classList.remove('is-hidden'))
-    const boxes = labels.map((n) => ({ n, r: n.firstElementChild!.getBoundingClientRect(), home: n.classList.contains('is-home') }))
-      .filter((b) => b.r.width > 0)
-      .sort((a, b) => Number(b.home) - Number(a.home) || a.r.width - b.r.width)
-    const kept: DOMRect[] = []
-    for (const b of boxes) {
-      const hit = kept.some((k) => b.r.left < k.right + 6 && b.r.right > k.left - 6 && b.r.top < k.bottom + 3 && b.r.bottom > k.top - 3)
-      if (hit) b.n.classList.add('is-hidden'); else kept.push(b.r)
-    }
+  const setData = (id: SourceId, fc: FC) => {
+    data.current[id] = fc
+    ;(map.current?.getSource(id) as GeoJSONSource | undefined)?.setData(fc)
+  }
+  const clearMarkers = (k: string) => { markers.current[k]?.forEach((mk) => mk.remove()); markers.current[k] = [] }
+  // Hover label for a marker, sharing the one tooltip popup.
+  const withTip = (mk: maplibregl.Marker, text: string, dy: number) => {
+    const node = mk.getElement()
+    node.addEventListener('mouseenter', () => tip.current?.setOffset([0, -dy]).setLngLat(mk.getLngLat()).setText(text).addTo(map.current!))
+    node.addEventListener('mouseleave', () => tip.current?.remove())
+    return mk
+  }
+  const place = (k: string, at: [number, number], node: HTMLElement, label?: string, dy = 14) => {
+    const mk = new maplibregl.Marker({ element: node }).setLngLat(ll(at)).addTo(map.current!)
+    if (label) withTip(mk, label, dy)
+    ;(markers.current[k] ??= []).push(mk)
+    return mk
   }
 
   // ── init ──
   useEffect(() => {
-    const m = L.map(el.current!, { zoomControl: false, preferCanvas: true, attributionControl: false, zoomSnap: 0.25, minZoom: 5, fadeAnimation: false }).setView(nearStart(p.home) ? [p.home!.lat, p.home!.lon] : p.start ? [p.start.lat, p.start.lon] : CALGARY, nearStart(p.home) ? 12 : p.start?.zoom ?? 11)
-    L.control.zoom({ position: 'bottomright' }).addTo(m)
-    const Stack = L.Control.extend({ onAdd: () => { const d = L.DomUtil.create('div', 'leaflet-control map-stack'); L.DomEvent.disableClickPropagation(d); return d } })
-    const stack = new Stack({ position: 'bottomright' }).addTo(m)
-    setStackEl(stack.getContainer()!)
-    m.createPane('labels').style.zIndex = '405'
-    m.createPane('route').style.zIndex = '410'
-    m.createPane('driven').style.zIndex = '411'
-    m.createPane('cams').style.zIndex = '420'
-    // Community names thin out as you zoom out, so the city view stays readable.
-    const zoomClass = () => { const z = m.getZoom(); el.current!.dataset.z = z >= 13 ? 'near' : z >= 11.5 ? 'mid' : z >= 10.5 ? 'far' : 'out' }
-    m.on('zoomend', () => { zoomClass(); declutter() }); zoomClass()
+    const at = nearStart(p.home) ? p.home! : p.start ?? CALGARY
+    const m = new maplibregl.Map({
+      container: el.current!, style: p.basemap === 'streets' ? LIBERTY : SAT, attributionControl: false,
+      center: [at.lon, at.lat], zoom: toGL(nearStart(p.home) ? 12 : p.start?.zoom ?? 11), minZoom: toGL(5),
+      pitch: 55, maxPitch: 85, fadeDuration: 0,
+    })
+    m.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'bottom-right')
+    // The app's own buttons sit in the same corner, above the zoom and compass buttons.
+    const stack = document.createElement('div')
+    stack.className = 'maplibregl-ctrl map-stack'
+    m.addControl({ onAdd: () => stack, onRemove: () => stack.remove() }, 'bottom-right')
+    setStackEl(stack)
+    tip.current = new maplibregl.Popup({ closeButton: false, closeOnClick: false, className: 'tip-pop', maxWidth: '280px' })
+    m.on('style.load', () => addOverlays(m, data.current, basemap.current))
+    m.on('error', (e) => console.warn('map:', e.error?.message))
+
     // Tell the app what's on screen (it loads road conditions for the visible map outside Alberta).
-    const view = () => { const b = m.getBounds(); cb.current.onView?.({ w: b.getWest(), s: b.getSouth(), e: b.getEast(), n: b.getNorth(), zoom: m.getZoom() }) }
+    const view = () => { const b = m.getBounds(); cb.current.onView?.({ w: b.getWest(), s: b.getSouth(), e: b.getEast(), n: b.getNorth(), zoom: fromGL(m.getZoom()) }) }
     m.on('moveend', view); setTimeout(view)
     // Dragging the map stops it following the live location.
     m.on('dragstart', () => cb.current.follow && cb.current.onUnfollow?.())
-    for (const k of ['communities', 'allRoads', 'all', 'roads', 'route', 'driven', 'progress', 'events', 'places', 'routeCams']) layers.current[k] = L.layerGroup().addTo(m)
+
+    // Quiet cameras and highway segments: hover for a label, tap a camera to open it.
+    const hoverable = ['rx-cams', 'rx-roads', 'rx-allroads']
+    m.on('mousemove', (e) => {
+      const f = m.getLayer('rx-cams') ? m.queryRenderedFeatures(e.point, { layers: hoverable.filter((l) => m.getLayer(l)) })[0] : undefined
+      m.getCanvas().style.cursor = f?.layer.id === 'rx-cams' ? 'pointer' : ''
+      if (!f) { tip.current!.remove(); return }
+      const cam = f.layer.id === 'rx-cams'
+      tip.current!.setOffset(cam ? [0, -6] : [0, -10]).setLngLat(cam ? (f.geometry as GeoJSON.Point).coordinates as [number, number] : e.lngLat).setHTML(f.properties.tip).addTo(m)
+    })
+    m.on('mouseout', () => tip.current!.remove())
 
     m.on('click', async (e) => {
-      const { lat, lng } = e.latlng
+      if ((e.originalEvent.target as Element).closest('.maplibregl-marker')) return
+      const cam = m.getLayer('rx-cams') && m.queryRenderedFeatures([[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]], { layers: ['rx-cams'] })[0]
+      if (cam) { cb.current.onCam(cam.properties.id); return }
+      const { lat, lng } = e.lngLat
       const div = document.createElement('div')
       div.className = 'pop-add'
       div.innerHTML = `<button class="btn-icon btn-xs pop-x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button><span class="mono">Here</span><b>…</b><button class="btn-accent btn-sm pop-go"></button>`
       const btn = div.querySelector<HTMLButtonElement>('.pop-go')!
       const hasHome = !!cb.current.home
       btn.textContent = hasHome ? '＋ Add stop' : 'Set as home'
-      const pop = L.popup({ className: 'pop', closeButton: false, offset: [0, -4] }).setLatLng(e.latlng).setContent(div).openOn(m)
-      div.querySelector<HTMLButtonElement>('.pop-x')!.onclick = () => m.closePopup(pop)
+      const pop = new maplibregl.Popup({ className: 'pop', closeButton: false, offset: 8, maxWidth: '300px' }).setLngLat(e.lngLat).setDOMContent(div).addTo(m)
+      div.querySelector<HTMLButtonElement>('.pop-x')!.onclick = () => pop.remove()
       const label = await reverse(lat, lng).catch(() => 'Dropped pin')
       div.querySelector('b')!.textContent = label
       btn.onclick = () => {
         const place = { id: crypto.randomUUID(), label, lat, lon: lng }
         if (hasHome) cb.current.onAddStop(place)
         else cb.current.onSetHome(place)
-        m.closePopup(pop)
+        pop.remove()
       }
     })
     map.current = m
-    const ro = new ResizeObserver(() => m.invalidateSize())
+    const ro = new ResizeObserver(() => m.resize())
     ro.observe(el.current!)
     return () => { ro.disconnect(); m.remove() }
   }, [])
 
   // ── basemap: satellite or streets ──
   useEffect(() => {
-    const m = map.current!
-    const tiles = basemapLayers(p.basemap).map((t) => t.addTo(m))
     el.current!.dataset.basemap = p.basemap
-    return () => { tiles.forEach((t) => t.remove()) }
+    if (basemap.current === p.basemap) return
+    basemap.current = p.basemap
+    map.current!.setStyle(p.basemap === 'streets' ? LIBERTY : SAT, { diff: false })
   }, [p.basemap])
 
   // ── Calgary communities: boundaries and names ──
   useEffect(() => {
-    const g = layers.current.communities
-    g.clearLayers()
-    if (!p.communities.length) return
-    const renderer = canvasFor('overlay')
-    const color = p.basemap === 'streets' ? '#5b4bd6' : '#ffffff'
-    for (const c of p.communities) {
-      L.polygon(c.rings, { renderer, color, weight: 1.2, opacity: p.basemap === 'streets' ? 0.55 : 0.6, dashArray: '5 4', fill: false, interactive: false }).addTo(g)
-      L.marker(c.label, { pane: 'labels', interactive: false, keyboard: false, icon: L.divIcon({ className: `mk-comm is-${c.kind}`, html: `<span>${c.name}</span>`, iconSize: [0, 0] }) }).addTo(g)
-    }
-    declutter()
-  }, [p.communities, p.basemap])
+    setData('rx-comm', { type: 'FeatureCollection', features: p.communities.map((c) => ({ type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: c.rings.map((r) => r.map(ll)) } })) })
+    // Neighbourhoods are placed before industrial areas and parks, then shorter names first so more of them fit.
+    setData('rx-comm-labels', { type: 'FeatureCollection', features: p.communities.map((c) => ({ type: 'Feature', properties: { name: c.name, kind: c.kind, rank: (c.kind === 'home' ? 0 : 1000) + c.name.length }, geometry: { type: 'Point', coordinates: ll(c.label) } })) })
+  }, [p.communities])
 
   // ── every camera, quiet ──
   useEffect(() => {
-    const g = layers.current.all
-    g.clearLayers()
-    const renderer = canvasFor('overlay')
-    for (const c of p.cameras) {
-      L.circleMarker([c.lat, c.lon], { renderer, radius: 4, weight: 1.5, color: 'rgba(0,0,0,.7)', fillColor: c.src === 'ab' ? '#ab9dff' : c.src === 'town' ? '#ffb86b' : '#e6eef8', fillOpacity: 0.9 })
-        .bindTooltip(c.name, { direction: 'top', className: 'tip', offset: [0, -4] })
-        .on('click', (e) => { L.DomEvent.stop(e); cb.current.onCam(c.id) })
-        .addTo(g)
-    }
+    const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => `&#${ch.charCodeAt(0)};`)
+    setData('rx-cams', { type: 'FeatureCollection', features: p.cameras.map((c) => ({ type: 'Feature', properties: { id: c.id, tip: esc(c.name), color: c.src === 'ab' ? '#ab9dff' : c.src === 'town' ? '#ffb86b' : '#e6eef8' }, geometry: { type: 'Point', coordinates: [c.lon, c.lat] } })) })
   }, [p.cameras])
 
   // ── route line, home and stops ──
   useEffect(() => {
-    const m = map.current!, g = layers.current.route, pl = layers.current.places
-    g.clearLayers(); pl.clearLayers()
-    if (p.home) L.marker([p.home.lat, p.home.lon], { icon: L.divIcon({ className: 'mk-home', html: '<span>⌂</span>', iconSize: [34, 34] }), zIndexOffset: 900 }).bindTooltip(p.home.label, { className: 'tip', direction: 'top', offset: [0, -16] }).addTo(pl)
+    const m = map.current!
+    clearMarkers('places')
+    if (p.home) place('places', [p.home.lat, p.home.lon], marker('mk-home', '<span>⌂</span>', 34, 9), p.home.label, 16)
     // No trip yet: keep the map on home. A home or trip in another part of Canada than the chosen city stays put.
-    if (!p.route) { if (p.home && nearStart(p.home)) m.flyTo([p.home.lat, p.home.lon], Math.max(m.getZoom(), 12), { duration: 0.8 }); return }
-    const ll = p.route.coords
-    // Lines draw on canvas (no CSS filters), so the glow is a wide, faint cyan stroke underneath.
-    L.polyline(ll, { pane: 'route', color: '#4cc9f0', opacity: 0.2, weight: 18, lineJoin: 'round', lineCap: 'round', interactive: false }).addTo(g)
-    L.polyline(ll, { pane: 'route', color: '#000', opacity: 0.6, weight: 9, lineJoin: 'round', lineCap: 'round', interactive: false }).addTo(g)
-    L.polyline(ll, { pane: 'route', color: '#5fd4f5', opacity: 1, weight: 5, lineJoin: 'round', lineCap: 'round', interactive: false }).addTo(g)
+    if (!p.route) {
+      setData('rx-route', EMPTY)
+      if (p.home && nearStart(p.home)) m.flyTo({ center: [p.home.lon, p.home.lat], zoom: Math.max(m.getZoom(), toGL(12)), duration: 800 })
+      return
+    }
+    setData('rx-route', lineFC(p.route.coords))
     const stops = p.route.order.slice(1).filter((s) => s.id !== p.home?.id)
-    stops.forEach((s, i) => L.marker([s.lat, s.lon], { icon: L.divIcon({ className: 'mk-stop', html: `<span>D${i + 1}</span>`, iconSize: [30, 30] }), zIndexOffset: 800 }).bindTooltip(s.label, { className: 'tip', direction: 'top', offset: [0, -14] }).addTo(pl))
-    const b = L.latLngBounds(ll)
-    if (nearStart({ lat: b.getCenter().lat, lon: b.getCenter().lng })) m.flyToBounds(b, { padding: [40, 40], duration: 0.8 })
-  }, [p.route, p.home])
+    stops.forEach((s, i) => place('places', [s.lat, s.lon], marker('mk-stop', `<span>D${i + 1}</span>`, 30, 8), s.label))
+    const b = new maplibregl.LngLatBounds()
+    for (const c of p.route.coords) b.extend([c[1], c[0]])
+    const c = b.getCenter()
+    if (nearStart({ lat: c.lat, lon: c.lng })) m.fitBounds(b, { padding: 40, duration: 800 })
+  }, [p.route, p.home]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 511 highway conditions along the route: a coloured halo under the route line ──
   useEffect(() => {
-    const g = layers.current.roads
-    g.clearLayers()
-    for (const r of p.routeRoads) {
-      if (!r.line?.length) continue
-      L.polyline(r.line, { renderer: canvasFor('overlay'), color: GRADE_COLOR[roadGrade(r)], weight: 20, opacity: 0.75, lineCap: 'butt', lineJoin: 'round' })
-        .bindTooltip([r.hwy, r.condition, ...r.extra].filter(Boolean).join(' · '), { className: 'tip', sticky: true })
-        .addTo(g).bringToBack()
-    }
+    setData('rx-roads', { type: 'FeatureCollection', features: p.routeRoads.filter((r) => r.line?.length).map((r) => ({ type: 'Feature', properties: { color: GRADE_COLOR[roadGrade(r)], tip: [r.hwy, r.condition, ...r.extra].filter(Boolean).join(' · ') }, geometry: { type: 'LineString', coordinates: r.line!.map(ll) } })) })
   }, [p.routeRoads])
 
   // ── every 511 highway segment (optional layer) ──
   useEffect(() => {
-    const g = layers.current.allRoads
-    g.clearLayers()
-    const renderer = canvasFor('overlay')
-    for (const r of p.allRoads) {
-      if (!r.line?.length) continue
+    setData('rx-allroads', { type: 'FeatureCollection', features: p.allRoads.filter((r) => r.line?.length).map((r) => {
       const grade = roadGrade(r)
-      L.polyline(r.line, { renderer, color: GRADE_COLOR[grade], weight: grade === 'dry' ? 4 : 5, opacity: 0.9, lineCap: 'round' })
-        .bindTooltip(`${[r.hwy, r.segment].filter(Boolean).join(' · ')}${r.hwy || r.segment ? '<br>' : ''}<b>${[r.condition, ...r.extra].join(' · ')}</b>`, { className: 'tip', sticky: true })
-        .addTo(g)
-    }
+      return { type: 'Feature', properties: { color: GRADE_COLOR[grade], w: grade === 'dry' ? 4 : 5, tip: `${[r.hwy, r.segment].filter(Boolean).join(' · ')}${r.hwy || r.segment ? '<br>' : ''}<b>${[r.condition, ...r.extra].join(' · ')}</b>` }, geometry: { type: 'LineString', coordinates: r.line!.map(ll) } }
+    }) })
   }, [p.allRoads])
 
   // ── numbered cameras on the route ──
   useEffect(() => {
-    const g = layers.current.routeCams
-    g.clearLayers(); camMarkers.current.clear()
+    clearMarkers('routeCams'); camMarkers.current.clear()
     p.routeCams.forEach((c, i) => {
-      const mk = L.marker([c.lat, c.lon], { pane: 'cams', icon: L.divIcon({ className: 'mk-cam', html: `<span>${i + 1}</span>`, iconSize: [26, 26] }), riseOnHover: true })
-        .bindTooltip(c.name, { className: 'tip', direction: 'top', offset: [0, -14] })
-        .on('click', () => cb.current.onCam(c.id))
-        .addTo(g)
-      camMarkers.current.set(c.id, mk)
+      const node = marker('mk-cam', `<span>${i + 1}</span>`, 26, 10)
+      node.addEventListener('click', (e) => { e.stopPropagation(); cb.current.onCam(c.id) })
+      camMarkers.current.set(c.id, place('routeCams', [c.lat, c.lon], node, c.name))
     })
-  }, [p.routeCams])
+  }, [p.routeCams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── incidents, closures, construction ──
   useEffect(() => {
-    const g = layers.current.events
-    g.clearLayers()
+    clearMarkers('events')
     for (const e of p.events) {
       const on = p.routeEventIds.has(e.id)
       // Off-route construction is everywhere in summer; keep the map readable.
       if (!on && e.kind === 'construction') continue
-      L.marker([e.lat, e.lon], {
-        icon: L.divIcon({ className: `mk-ev mk-${e.kind} ${on ? 'on' : 'off'}`, html: `<span>${EVENT_GLYPH[e.kind]}</span>`, iconSize: on ? [26, 26] : [18, 18] }),
-        zIndexOffset: on ? 700 : 0,
-      })
-        .bindTooltip(e.title, { className: 'tip', direction: 'top', offset: [0, -12] })
-        .on('click', () => cb.current.onEvent(e.id))
-        .addTo(g)
+      const node = marker(`mk-ev mk-${e.kind} ${on ? 'on' : 'off'}`, `<span>${EVENT_GLYPH[e.kind]}</span>`, on ? 26 : 18, on ? 7 : 2)
+      node.addEventListener('click', (ev) => { ev.stopPropagation(); cb.current.onEvent(e.id) })
+      place('events', [e.lat, e.lon], node, e.title, 12)
     }
-  }, [p.events, p.routeEventIds])
+  }, [p.events, p.routeEventIds]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── the active camera: ring + ping, and keep it in view ──
   useEffect(() => {
     camMarkers.current.forEach((mk, id) => {
-      const node = mk.getElement()
-      if (!node) return
-      const on = id === p.activeCam
+      const node = mk.getElement(), on = id === p.activeCam
       node.classList.toggle('active', on)
-      if (on) {
-        mk.setZIndexOffset(1000)
-        node.classList.remove('ping'); void node.offsetWidth; node.classList.add('ping')
-      } else mk.setZIndexOffset(0)
+      node.style.zIndex = on ? '11' : '10'
+      if (on) { node.classList.remove('ping'); void node.offsetWidth; node.classList.add('ping') }
     })
     const mk = p.activeCam ? camMarkers.current.get(p.activeCam) : undefined
     const m = map.current
-    if (mk && m) {
-      const b = m.getBounds().pad(-0.22)
-      if (!b.contains(mk.getLatLng())) m.panTo(mk.getLatLng(), { animate: true, duration: 0.6, easeLinearity: 0.2 })
-    }
+    if (mk && m && !inView(m, mk.getLngLat(), 0.22)) m.easeTo({ center: mk.getLngLat(), duration: 600 })
   }, [p.activeCam, p.routeCams])
 
   // ── "driven so far" line to the camera you're looking at ──
   useEffect(() => {
-    const g = layers.current.progress
-    if (!p.route || p.focusAlong == null) { g.clearLayers(); progress.current = null; return }
-    const pts = sliceTo(p.route, p.focusAlong), at = pointAt(p.route, p.focusAlong)
-    if (!progress.current) {
-      const glow = L.polyline(pts, { pane: 'route', color: '#e3f8ff', weight: 14, opacity: 0.22, lineCap: 'round', interactive: false }).addTo(g)
-      const line = L.polyline(pts, { pane: 'route', color: '#e3f8ff', weight: 4, opacity: 1, lineCap: 'round', interactive: false }).addTo(g)
-      const car = L.marker(at, { pane: 'route', icon: L.divIcon({ className: 'mk-car', html: '<i></i>', iconSize: [16, 16] }), interactive: false }).addTo(g)
-      progress.current = { line, glow, car }
-    } else {
-      progress.current.line.setLatLngs(pts)
-      progress.current.glow.setLatLngs(pts)
-      progress.current.car.setLatLng(at)
-    }
+    if (!p.route || p.focusAlong == null) { setData('rx-progress', EMPTY); car.current?.remove(); car.current = null; return }
+    setData('rx-progress', lineFC(sliceTo(p.route, p.focusAlong)))
+    const at = ll(pointAt(p.route, p.focusAlong))
+    if (!car.current) car.current = new maplibregl.Marker({ element: marker('mk-car', '<i></i>', 16, 6) }).setLngLat(at).addTo(map.current!)
+    else car.current.setLngLat(at)
   }, [p.route, p.focusAlong])
 
   // ── live trip: the part of the route already driven, greyed out ──
-  const drivenLine = useRef<L.Polyline | null>(null)
   useEffect(() => {
-    const g = layers.current.driven
-    if (!p.route || p.driven == null || p.driven < 20) { g.clearLayers(); drivenLine.current = null; return }
-    const pts = sliceTo(p.route, p.driven)
-    if (!drivenLine.current) drivenLine.current = L.polyline(pts, { renderer: svgLive(), pane: 'driven', color: '#5b6577', weight: 7, opacity: 0.95, lineCap: 'round', interactive: false }).addTo(g)
-    else drivenLine.current.setLatLngs(pts)
+    setData('rx-driven', !p.route || p.driven == null || p.driven < 20 ? EMPTY : lineFC(sliceTo(p.route, p.driven)))
   }, [p.route, p.driven])
 
   // ── live location: dot, accuracy circle, and a heading cone while moving ──
   useEffect(() => {
     const m = map.current!
-    if (!p.me) { me.current?.dot.remove(); me.current?.acc.remove(); me.current = null; return }
-    const at: L.LatLngTuple = [p.me.lat, p.me.lon]
+    if (!p.me) { me.current?.remove(); me.current = null; setData('rx-acc', EMPTY); return }
+    const at: LngLatLike = [p.me.lon, p.me.lat]
     const moving = p.me.heading != null && !Number.isNaN(p.me.heading) && (p.me.speed ?? 0) > 1
-    if (!me.current) {
-      const acc = L.circle(at, { radius: p.me.acc, renderer: svgLive(), pane: 'driven', color: '#3b9bff', weight: 1, opacity: 0.5, fillColor: '#3b9bff', fillOpacity: 0.12, interactive: false }).addTo(m)
-      const dot = L.marker(at, { pane: 'cams', interactive: false, keyboard: false, zIndexOffset: 1200, icon: L.divIcon({ className: 'mk-me', html: '<b></b><i></i><span></span>', iconSize: [22, 22] }) }).addTo(m)
-      me.current = { dot, acc }
-    }
-    me.current.acc.setLatLng(at).setRadius(p.me.acc)
-    me.current.dot.setLatLng(at)
-    // Following: re-centre only when the dot nears the edge of the view. Each pan redraws every path on the map, so
-    // panning on every fix (once a second or more) kept the map busy.
-    if (p.follow && !m.getBounds().pad(-0.25).contains(at)) {
+    // The dot turns with the map so the heading cone keeps pointing the way you drive, but stays upright when tilted.
+    if (!me.current) me.current = new maplibregl.Marker({ element: marker('mk-me', '<b></b><i></i><span></span>', 22, 12), rotationAlignment: 'map', pitchAlignment: 'viewport' }).setLngLat(at).addTo(m)
+    me.current.setLngLat(at)
+    setData('rx-acc', circle(p.me.lat, p.me.lon, p.me.acc))
+    // Following: re-centre only when the dot nears the edge of the view.
+    if (p.follow && !inView(m, at, 0.25)) {
       // A short hop glides; a long one (the phone was asleep, or a fix jumped) moves straight there.
-      const d = m.latLngToContainerPoint(at).distanceTo(m.getSize().divideBy(2)), far = d > Math.min(m.getSize().x, m.getSize().y) * 0.75
-      m.panTo(at, { animate: !far, duration: 0.3 })
+      const pt = m.project(at), c = m.getContainer()
+      const far = Math.hypot(pt.x - c.clientWidth / 2, pt.y - c.clientHeight / 2) > Math.min(c.clientWidth, c.clientHeight) * 0.75
+      if (far) m.jumpTo({ center: at }); else m.easeTo({ center: at, duration: 300 })
     }
-    const node = me.current.dot.getElement()
-    if (node) {
-      node.classList.toggle('is-moving', moving)
-      node.style.setProperty('--heading', `${moving ? p.me.heading : 0}deg`)
-    }
+    const node = me.current.getElement()
+    node.classList.toggle('is-moving', moving)
+    node.style.setProperty('--heading', `${moving ? p.me.heading : 0}deg`)
   }, [p.me]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Starting to follow: bring the map to the live location, close enough to see the street.
   useEffect(() => {
-    if (p.follow && p.me && map.current) map.current.setView([p.me.lat, p.me.lon], Math.max(map.current.getZoom(), 15), { animate: true })
+    const m = map.current
+    if (p.follow && p.me && m) m.easeTo({ center: [p.me.lon, p.me.lat], zoom: Math.max(m.getZoom(), toGL(15)) })
   }, [p.follow]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (p.flyTo && map.current) map.current.flyTo([p.flyTo.lat, p.flyTo.lon], p.flyTo.zoom ?? Math.max(map.current.getZoom(), 15), { duration: 0.8 })
+    const m = map.current
+    if (p.flyTo && m) m.flyTo({ center: [p.flyTo.lon, p.flyTo.lat], zoom: p.flyTo.zoom != null ? toGL(p.flyTo.zoom) : Math.max(m.getZoom(), toGL(15)), duration: 800 })
   }, [p.flyTo])
 
   return <><div ref={el} className="map" aria-label="Map" />{stackEl && p.controls && createPortal(p.controls, stackEl)}</>
+}
+
+// Whether a point is on screen, at least `inset` (a share of the width and height) away from the edges.
+function inView(m: maplibregl.Map, at: LngLatLike, inset: number) {
+  const pt = m.project(at), c = m.getContainer(), w = c.clientWidth, h = c.clientHeight
+  return pt.x > w * inset && pt.x < w * (1 - inset) && pt.y > h * inset && pt.y < h * (1 - inset)
 }
